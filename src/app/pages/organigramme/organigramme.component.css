@@ -1,0 +1,273 @@
+/* Organigramme styles */
+.org-chart-container {
+  overflow-x: auto;
+  padding: 2rem 0;
+}
+
+.org-chart {
+  min-width: 800px;
+  display: flex;
+  justify-content: center;
+}
+
+.org-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 2rem;
+}
+
+.org-node-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.org-node {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  min-width: 200px;
+  max-width: 250px;
+}
+
+.org-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.org-node.small {
+  min-width: 150px;
+  max-width: 180px;
+  padding: 0.75rem;
+}
+
+.node-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.node-avatar.small {
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+}
+
+.node-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.node-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.node-name.small {
+  font-size: 0.875rem;
+}
+
+.node-position {
+  color: #6b7280;
+  margin: 0 0 0.25rem 0;
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+.node-position.small {
+  font-size: 0.75rem;
+}
+
+.node-email {
+  color: #9ca3af;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Niveaux hiérarchiques */
+.level-0 {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2, #ffffff);
+}
+
+.level-0 .node-avatar {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.level-1 {
+  border-color: #f97316;
+  background: linear-gradient(135deg, #fff7ed, #ffffff);
+}
+
+.level-1 .node-avatar {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+}
+
+.level-2 {
+  border-color: #2196F3;
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+}
+
+.level-2 .node-avatar {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.level-3 {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #ecfdf5, #ffffff);
+}
+
+.level-3 .node-avatar {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.level-4 {
+  border-color: #6b7280;
+  background: linear-gradient(135deg, #f9fafb, #ffffff);
+}
+
+.level-4 .node-avatar {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+/* Lignes de connexion */
+.connection-line {
+  width: 2px;
+  height: 30px;
+  background: #d1d5db;
+  margin: 0.5rem 0;
+}
+
+.children-container {
+  display: flex;
+  gap: 2rem;
+  position: relative;
+}
+
+.children-container::before {
+  content: '';
+  position: absolute;
+  top: -15px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #d1d5db;
+}
+
+.child-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.branch-line {
+  width: 2px;
+  height: 15px;
+  background: #d1d5db;
+  margin-bottom: 0.5rem;
+}
+
+.sub-children-container {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sub-connection-line {
+  width: 2px;
+  height: 20px;
+  background: #d1d5db;
+  margin: 0.5rem 0;
+}
+
+.sub-children-grid {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sub-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sub-branch-line {
+  width: 2px;
+  height: 10px;
+  background: #d1d5db;
+  margin-bottom: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .org-chart {
+    min-width: 600px;
+  }
+  
+  .org-node {
+    min-width: 160px;
+    max-width: 180px;
+    padding: 0.75rem;
+  }
+  
+  .node-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+  
+  .children-container {
+    gap: 1rem;
+  }
+  
+  .sub-children-grid {
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .org-chart {
+    min-width: 400px;
+  }
+  
+  .org-node {
+    min-width: 140px;
+    max-width: 160px;
+    padding: 0.5rem;
+  }
+  
+  .node-name {
+    font-size: 0.875rem;
+  }
+  
+  .node-position {
+    font-size: 0.75rem;
+  }
+}

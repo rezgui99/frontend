@@ -1,0 +1,112 @@
+<div class="p-6">
+  <h2 class="text-3xl font-bold text-primary mb-6">📊 Organigramme</h2>
+  
+  <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-lg mb-6">
+    <h3 class="text-xl font-semibold mb-2">Structure Organisationnelle</h3>
+    <p class="text-blue-100">Visualisez la hiérarchie et les relations entre les postes et employés de votre organisation.</p>
+  </div>
+
+  <div *ngIf="loading" class="text-center text-primary py-8">
+    Chargement de l'organigramme...
+  </div>
+
+  <div *ngIf="errorMessage" class="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+    {{ errorMessage }}
+  </div>
+
+  <div *ngIf="!loading && orgChart.length === 0" class="text-center text-gray-600 py-8">
+    <div class="mb-4">
+      <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a3 3 0 015.356-1.857M17 20v-2c0-.653-.146-1.28-.42-1.857M7 20v-2c0-.653.146-1.28.42-1.857M7 20h10m0 0a3 3 0 00-5.356-1.857M7 16.143A3 3 0 0112 13c1.482 0 2.86.51 3.944 1.386M12 14a3 3 0 100-6 3 3 0 000 6z"></path>
+      </svg>
+    </div>
+    <p>Aucune donnée organisationnelle disponible.</p>
+    <p class="text-sm text-gray-500 mt-2">Assurez-vous d'avoir des fiches de poste avec des relations hiérarchiques définies.</p>
+  </div>
+
+  <!-- Organigramme -->
+  <div *ngIf="!loading && orgChart.length > 0" class="org-chart-container">
+    <div class="org-chart">
+      <div *ngFor="let rootNode of orgChart" class="org-tree">
+        <div class="org-node-container">
+          <div [class]="'org-node ' + getNodeClass(rootNode.level)">
+            <div class="node-avatar">
+              {{ rootNode.name.charAt(0).toUpperCase() }}
+            </div>
+            <div class="node-info">
+              <h4 class="node-name">{{ rootNode.name }}</h4>
+              <p class="node-position">{{ rootNode.position }}</p>
+              <p *ngIf="rootNode.email" class="node-email">{{ rootNode.email }}</p>
+            </div>
+          </div>
+          
+          <!-- Ligne de connexion vers les enfants -->
+          <div *ngIf="rootNode.children.length > 0" class="connection-line"></div>
+          
+          <!-- Enfants -->
+          <div *ngIf="rootNode.children.length > 0" class="children-container">
+            <div *ngFor="let child of rootNode.children" class="child-branch">
+              <div class="branch-line"></div>
+              <div [class]="'org-node ' + getNodeClass(child.level)">
+                <div class="node-avatar">
+                  {{ child.name.charAt(0).toUpperCase() }}
+                </div>
+                <div class="node-info">
+                  <h4 class="node-name">{{ child.name }}</h4>
+                  <p class="node-position">{{ child.position }}</p>
+                  <p *ngIf="child.email" class="node-email">{{ child.email }}</p>
+                </div>
+              </div>
+              
+              <!-- Sous-enfants (niveau 2) -->
+              <div *ngIf="child.children.length > 0" class="sub-children-container">
+                <div class="sub-connection-line"></div>
+                <div class="sub-children-grid">
+                  <div *ngFor="let subChild of child.children" class="sub-child">
+                    <div class="sub-branch-line"></div>
+                    <div [class]="'org-node small ' + getNodeClass(subChild.level)">
+                      <div class="node-avatar small">
+                        {{ subChild.name.charAt(0).toUpperCase() }}
+                      </div>
+                      <div class="node-info">
+                        <h5 class="node-name small">{{ subChild.name }}</h5>
+                        <p class="node-position small">{{ subChild.position }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Légende -->
+  <div *ngIf="!loading && orgChart.length > 0" class="mt-8 card">
+    <h3 class="text-lg font-semibold text-dark mb-4">Légende</h3>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="flex items-center">
+        <div class="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
+        <span class="text-sm">Direction</span>
+      </div>
+      <div class="flex items-center">
+        <div class="w-4 h-4 rounded-full bg-orange-500 mr-2"></div>
+        <span class="text-sm">Management</span>
+      </div>
+      <div class="flex items-center">
+        <div class="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
+        <span class="text-sm">Superviseurs</span>
+      </div>
+      <div class="flex items-center">
+        <div class="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
+        <span class="text-sm">Employés</span>
+      </div>
+      <div class="flex items-center">
+        <div class="w-4 h-4 rounded-full bg-gray-500 mr-2"></div>
+        <span class="text-sm">Postes vacants</span>
+      </div>
+    </div>
+  </div>
+</div>

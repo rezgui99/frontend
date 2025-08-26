@@ -1,0 +1,104 @@
+<div class="p-6">
+  <h2 class="text-3xl font-bold text-primary mb-6">Liste des Compétences</h2>
+
+  <!-- Bouton ajout compétence -->
+  <div class="mb-4">
+    <button (click)=" showAddForm = ! showAddForm" class="btn btn-primary">
+      {{  showAddForm ? 'Annuler' : 'Ajouter une compétence' }}
+    </button>
+  </div>
+
+  <!-- Formulaire ajout / modification compétence -->
+  <div *ngIf="( showAddForm || editingSkill)" class="card mb-6 p-6">
+    <h3 class="text-xl font-semibold text-dark mb-4">
+      {{ editingSkill ? 'Modifier compétence' : 'Ajouter compétence' }}
+    </h3>
+    <form [formGroup]="skillForm" (ngSubmit)="onSubmit()">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Employé *</label>
+          <select formControlName="employee_id" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">Sélectionner un employé</option>
+            <option *ngFor="let e of employees" [value]="e.id">{{ e.name }}</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Compétence *</label>
+          <select formControlName="skill_id" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">Sélectionner une compétence</option>
+            <option *ngFor="let sk of skillsList" [value]="sk.id">{{ sk.name }}</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Niveau actuel</label>
+          <select formControlName="actual_skill_level_id" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+            <option [ngValue]="null">Sélectionner niveau</option>
+            <option *ngFor="let level of skillLevels" [ngValue]="level">{{ level.level_name }}</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Date acquisition</label>
+          <input type="date" formControlName="acquired_date" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Certificat</label>
+          <input type="text" formControlName="certification" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Dernière évaluation</label>
+          <input type="date" formControlName="last_evaluated_date" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+      </div>
+
+      <div class="mt-6 flex gap-2">
+        <button type="submit" [disabled]="!skillForm.valid" class="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+          {{ editingSkill ? 'Mettre à jour' : 'Ajouter' }}
+        </button>
+        <button type="button" (click)="cancelEdit()" class="btn btn-secondary">
+          Annuler
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Liste des compétences -->
+  <div class="card">
+    <div class="overflow-x-auto">
+      <table class="min-w-full table-auto">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Compétence</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Niveau actuel</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date acquisition</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Certificat</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dernière évaluation</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngFor="let s of skills" class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.Employee?.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.Skill?.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.SkillLevel?.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.acquired_date | date:'dd/MM/yyyy' }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.certification || '-' }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.last_evaluated_date | date:'dd/MM/yyyy' }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
+              <button (click)="editSkill(s)" class="text-primary hover:text-blue-700">Modifier</button>
+              <button (click)="deleteSkill(s)" class="text-red-600 hover:text-red-900">Supprimer</button>
+            </td>
+          </tr>
+          <tr *ngIf="skills.length === 0">
+            <td colspan="7" class="text-center py-4 text-gray-600">Aucune compétence trouvée.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
