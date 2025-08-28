@@ -175,16 +175,8 @@ export class EmployeesComponent implements OnInit {
         gender: formValue.gender || '',
         location: formValue.location || '',
         notes: formValue.notes || '',
-        job_description_id: this.parseIntegerField(formValue.job_description_id) || undefined,
-        skills: formValue.skills
-          .filter((skill: any) => skill.skill_id && skill.actual_skill_level_id)
-          .map((skill: any) => ({
-            skill_id: parseInt(skill.skill_id, 10),
-            actual_skill_level_id: parseInt(skill.actual_skill_level_id, 10),
-            acquired_date: skill.acquired_date || null,
-            certification: skill.certification || null,
-            last_evaluated_date: skill.last_evaluated_date || null
-          }))
+        
+       
       } as Employee;
       
       console.log('Données employé à envoyer:', employeeData);
@@ -229,7 +221,7 @@ export class EmployeesComponent implements OnInit {
 
   editEmployee(employee: Employee): void {
     this.editingEmployee = employee;
-    this.showAddForm = false;
+    
     
     // Remplir les champs de base
     this.employeeForm.patchValue({
@@ -241,26 +233,11 @@ export class EmployeesComponent implements OnInit {
       gender: employee.gender || '',
       location: employee.location || '',
       notes: employee.notes || '',
-      job_description_id: employee.job_description_id || ''
+      
     });
 
-    // Vider et remplir les compétences
-    while (this.skillsFormArray.length !== 0) {
-      this.skillsFormArray.removeAt(0);
-    }
-    
-    if (employee.skills && employee.skills.length > 0) {
-      employee.skills.forEach(empSkill => {
-        const skillGroup = this.formBuilder.group({
-          skill_id: [empSkill.skill_id || '', Validators.required],
-          actual_skill_level_id: [empSkill.actual_skill_level_id || '', Validators.required],
-          acquired_date: [empSkill.acquired_date || ''],
-          certification: [empSkill.certification || ''],
-          last_evaluated_date: [empSkill.last_evaluated_date || '']
-        });
-        this.skillsFormArray.push(skillGroup);
-      });
-    }
+   
+   
   }
 
   deleteEmployee(employee: Employee): void {
@@ -291,70 +268,14 @@ export class EmployeesComponent implements OnInit {
     this.errorMessage = null;
   }
 
-  // Affectation à une fiche de poste
-  showAssignJob(employee: Employee): void {
-    this.assigningEmployee = employee;
-    this.selectedJobId = employee.job_description_id || null;
-    this.showAssignJobForm = true;
-    this.errorMessage = null;
-  }
+ 
 
-  assignToJob(): void {
-    if (!this.assigningEmployee || this.selectedJobId === null) {
-      this.errorMessage = 'Veuillez sélectionner une fiche de poste.';
-      return;
-    }
 
-    // Utiliser le controller jobdescriptionemployee pour l'affectation
-    this.employeeService.assignEmployeeToJobDescription(this.assigningEmployee.id!, this.selectedJobId).subscribe({
-      next: (updatedEmployee) => {
-        // Mettre à jour l'employé localement
-        const index = this.employees.findIndex(emp => emp.id === this.assigningEmployee!.id);
-        if (index !== -1) {
-          this.employees[index].job_description_id = this.selectedJobId;
-        }
-        this.cancelAssignJob();
-        this.errorMessage = null;
-        console.log('✅ Employé affecté avec succès');
-      },
-      error: (err) => {
-        console.error('Error assigning employee to job:', err);
-        this.errorMessage = `❌ Erreur affectation: ${err.error?.message || err.message}`;
-      }
-    });
-  }
 
-  cancelAssignJob(): void {
-    this.assigningEmployee = null;
-    this.selectedJobId = null;
-    this.showAssignJobForm = false;
-    this.errorMessage = null;
-  }
 
-  // Nouvelle méthode pour désaffecter un employé
-  unassignFromJob(employee: Employee): void {
-    if (!employee.job_description_id) {
-      this.errorMessage = 'Cet employé n\'est pas affecté à une fiche de poste.';
-      return;
-    }
 
-    if (window.confirm(`Êtes-vous sûr de vouloir désaffecter ${employee.name} de sa fiche de poste ?`)) {
-      this.employeeService.unassignEmployeeFromJobDescription(employee.id!, employee.job_description_id).subscribe({
-        next: () => {
-          const index = this.employees.findIndex(emp => emp.id === employee.id);
-          if (index !== -1) {
-            this.employees[index].job_description_id = null;
-          }
-          this.errorMessage = null;
-          console.log('✅ Employé désaffecté avec succès');
-        },
-        error: (err) => {
-          console.error('Error unassigning employee from job:', err);
-          this.errorMessage = `❌ Erreur désaffectation: ${err.error?.message || err.message}`;
-        }
-      });
-    }
-  }
+
+    
 
   // Méthode pour voir tous les employés d'une fiche de poste
   viewEmployeesOfJob(jobId: number): void {
