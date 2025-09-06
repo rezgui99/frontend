@@ -1,0 +1,175 @@
+<div class="p-6">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h2 class="text-3xl font-bold text-primary">📊 Analytics RH Avancées</h2>
+      <p class="text-gray-600 mt-2">Statistiques détaillées et recommandations intelligentes</p>
+    </div>
+    <div class="flex space-x-3">
+      
+    
+    </div>
+  </div>
+
+  <!-- Filtres -->
+  <div class="card mb-6">
+    <h3 class="text-lg font-semibold text-dark mb-4">🔍 Filtres d'Analyse</h3>
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">Date de début</label>
+        <input type="date" [(ngModel)]="filters.date_from" 
+               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+      </div>
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">Date de fin</label>
+        <input type="date" [(ngModel)]="filters.date_to" 
+               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+      </div>
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">Département</label>
+        <select [(ngModel)]="filters.department" 
+                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+          <option value="">Tous les départements</option>
+          <option value="Développement">Développement</option>
+          <option value="Support">Support</option>
+          <option value="Commercial">Commercial</option>
+          <option value="Ressources Humaines">Ressources Humaines</option>
+          <option value="Marketing">Marketing</option>
+        </select>
+      </div>
+      
+      <div class="flex items-end space-x-2">
+        <button (click)="applyFilters()" class="btn btn-primary flex-1">
+          Appliquer
+        </button>
+        <button (click)="clearFilters()" class="btn btn-secondary flex-1">
+          Effacer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation par onglets -->
+  <div class="mb-6">
+    <nav class="flex space-x-8" aria-label="Tabs">
+      <button (click)="setActiveTab('overview')" 
+              [class]="activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+        📊 Vue d'ensemble
+      </button>
+      <button (click)="setActiveTab('departments')" 
+              [class]="activeTab === 'departments' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+        🏢 Départements
+      </button>
+      <button (click)="setActiveTab('skills')" 
+              [class]="activeTab === 'skills' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+        🎯 Compétences demandées
+      </button>
+     
+    </nav>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="text-center text-primary py-8">
+    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <p class="mt-2">Chargement des analytics...</p>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="errorMessage" class="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-md">
+    <div class="flex">
+      <svg class="h-5 w-5 text-yellow-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+      </svg>
+      {{ errorMessage }}
+    </div>
+  </div>
+
+  <!-- Vue d'ensemble -->
+  <div *ngIf="activeTab === 'overview' && !loading && analyticsOverview">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-blue-50 p-6 rounded-lg text-center">
+        <div class="text-3xl font-bold text-blue-600">{{ analyticsOverview.total_employees }}</div>
+        <div class="text-sm text-gray-600">Employés totaux</div>
+      </div>
+      <div class="bg-green-50 p-6 rounded-lg text-center">
+        <div class="text-3xl font-bold text-green-600">{{ analyticsOverview.total_applications }}</div>
+        <div class="text-sm text-gray-600">Candidatures</div>
+      </div>
+      <div class="bg-yellow-50 p-6 rounded-lg text-center">
+        <div class="text-3xl font-bold text-yellow-600">{{ analyticsOverview.overall_success_rate | number:'1.1-1' }}%</div>
+        <div class="text-sm text-gray-600">Taux de succès</div>
+      </div>
+      <div class="bg-purple-50 p-6 rounded-lg text-center">
+        <div class="text-3xl font-bold text-purple-600">{{ analyticsOverview.total_job_descriptions }}</div>
+        <div class="text-sm text-gray-600">Postes disponibles</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistiques par département -->
+  <div *ngIf="activeTab === 'departments' && !loading">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">📊 Performance par Département</h3>
+        <div class="relative h-80">
+          <canvas #departmentChart></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">📋 Détails par Département</h3>
+        <div class="space-y-4">
+          <div *ngFor="let dept of departmentStats" class="border rounded-lg p-4">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="font-semibold text-gray-900">{{ dept.department }}</h4>
+              <span class="text-lg font-bold text-green-600">{{ dept.success_rate | number:'1.1-1' }}%</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>Candidatures: {{ dept.total_applications }}</div>
+              <div>Succès: {{ dept.successful_applications }}</div>
+              <div>Temps moyen: {{ dept.average_time_to_hire }}j</div>
+              <div>Taux: {{ dept.success_rate | number:'1.1-1' }}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  
+  <!-- Analyse des compétences demandées -->
+  <div *ngIf="activeTab === 'skills' && !loading">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">🎯 Top Compétences Demandées</h3>
+        <div class="relative h-80">
+          <canvas #skillsChart></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">📈 Analyse Détaillée des Compétences</h3>
+        <div class="space-y-3">
+          <div *ngFor="let skill of skillsDemand.slice(0, 8)" class="border rounded-lg p-3">
+            <div class="flex justify-between items-center mb-2">
+              <h5 class="font-medium text-gray-900">{{ skill.skill_name }}</h5>
+              <span class="text-sm font-bold text-blue-600">{{ skill.demand_count }} demandes</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
+              <div>Taux de succès: {{ skill.success_rate_with_skill | number:'1.1-1' }}%</div>
+              <div>Niveau moyen requis: {{ skill.average_level_required | number:'1.1-1' }}</div>
+            </div>
+            <div class="mt-2">
+              <div class="w-full bg-gray-200 rounded-full h-1">
+                <div class="bg-blue-600 h-1 rounded-full"
+                     [style.width.%]="skill.success_rate_with_skill">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

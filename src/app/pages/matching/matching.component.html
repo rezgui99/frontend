@@ -36,74 +36,80 @@
     </div>
   </div>
 
-  <!-- Section Affectation Automatique -->
-  <div *ngIf="matchingResults.length > 0" class="card mb-6 bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-400">
-    <h3 class="text-xl font-semibold text-dark mb-4">🤖 Affectation Automatique</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <label class="block text-gray-700 text-sm font-bold mb-2">Score minimum requis: {{ minScoreForAssignment }}%</label>
-        <input type="range" [(ngModel)]="minScoreForAssignment" min="50" max="100" step="5" 
-               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-        <div class="flex justify-between text-xs text-gray-500 mt-1">
-          <span>50%</span>
-          <span>75%</span>
-          <span>100%</span>
-        </div>
-      </div>
-      <div>
-        <label class="block text-gray-700 text-sm font-bold mb-2">Nombre max d'affectations: {{ maxAssignments }}</label>
-        <input type="range" [(ngModel)]="maxAssignments" min="1" max="10" step="1" 
-               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-        <div class="flex justify-between text-xs text-gray-500 mt-1">
-          <span>1</span>
-          <span>5</span>
-          <span>10</span>
-        </div>
-      </div>
-    </div>
-    
-    <div class="mb-4 p-3 bg-blue-100 rounded-md">
-      <p class="text-sm text-blue-800">
-        <strong>Candidats éligibles:</strong> 
-        {{ eligibleCandidates.length }} employé(s) 
-        avec un score ≥ {{ minScoreForAssignment }}%
-      </p>
-    </div>
+  
 
-    <button (click)="performAutoAssignment()" 
-            [disabled]="loadingAutoAssignment || eligibleCandidates.length === 0" 
-            class="btn btn-primary bg-green-600 hover:bg-green-700">
-      <span *ngIf="!loadingMatching">Lancer le Matching</span>
-      <span *ngIf="loadingMatching">Chargement...</span>
-      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-      </svg>
-      <span *ngIf="!loadingAutoAssignment">Affectation Automatique</span>
-      <span *ngIf="loadingAutoAssignment">Affectation en cours...</span>
-    </button>
-  </div>
-
-  <div *ngIf="loadingMatching" class="text-center text-primary mb-4">
-    Calcul du matching en cours...
-  </div>
-
-  <div *ngIf="matchingErrorMessage" class="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
-    {{ matchingErrorMessage }}
-  </div>
-
-  <!-- Messages d'affectation automatique -->
-  <div *ngIf="autoAssignmentMessage" class="mt-4 p-4 rounded-md" 
-       [class]="autoAssignmentMessage.includes('✅') ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'">
-    <pre class="whitespace-pre-wrap font-sans">{{ autoAssignmentMessage }}</pre>
-  </div>
 
   <div *ngIf="matchingResults.length > 0" class="mt-8">
     <h3 class="text-2xl font-bold text-primary mb-4">Résultats du Matching</h3>
+    
+    <!-- Prédictions de succès -->
+    <div *ngIf="successPredictions.length > 0" class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+      <h4 class="text-lg font-semibold text-purple-800 mb-3">🔮 Prédictions de Succès</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div *ngFor="let prediction of successPredictions" class="bg-white p-3 rounded-lg border">
+          <div class="flex justify-between items-center mb-2">
+            <span class="font-medium text-gray-900">{{ getEmployeeNameFromPrediction(prediction) }}</span>
+            <span class="text-lg font-bold" [ngClass]="getPredictionClass(prediction.success_probability)">
+              {{ prediction.success_probability }}%
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" [ngClass]="getConfidenceClass(prediction.confidence_level)">
+              {{ getConfidenceLabel(prediction.confidence_level) }}
+            </span>
+            <span class="text-xs text-gray-500">Score entretien: {{ prediction.estimated_interview_score }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <app-employee-card *ngFor="let result of matchingResults"
-                         [employee]="getEmployeeFromResult(result)"
-                         [matchingScore]="result.score">
-      </app-employee-card>
+      <div *ngFor="let result of matchingResults" class="card">
+        <div class="flex items-center space-x-4 mb-4">
+          <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold">
+            {{ getEmployeeFromResult(result).name.charAt(0).toUpperCase() }}
+          </div>
+          <div class="flex-1">
+            <h3 class="text-lg font-semibold text-gray-900">{{ getEmployeeFromResult(result).name }}</h3>
+            <p class="text-sm text-gray-600">{{ getEmployeeFromResult(result).position }}</p>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-green-600">{{ result.score | number:'1.1-1' }}%</div>
+            <div class="text-xs text-gray-500">Compatibilité</div>
+          </div>
+        </div>
+        
+        <!-- Prédiction de succès pour ce candidat -->
+        <div *ngIf="getPredictionForEmployee(result.employee_id)" class="mb-4 p-3 bg-purple-50 rounded-lg">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-purple-800">Prédiction de succès</span>
+            <span class="text-lg font-bold" [ngClass]="getPredictionClass(getPredictionForEmployee(result.employee_id)?.success_probability || 0)">
+              {{ getPredictionForEmployee(result.employee_id)?.success_probability }}%
+            </span>
+          </div>
+          <div class="text-xs text-purple-600">
+            Confiance: {{ getConfidenceLabel(getPredictionForEmployee(result.employee_id)?.confidence_level || 'low') }}
+          </div>
+        </div>
+
+        <!-- Détails des compétences -->
+        <div *ngIf="result.skill_gap_details && result.skill_gap_details.length > 0" class="space-y-2">
+          <h4 class="text-sm font-medium text-gray-700">Analyse des compétences :</h4>
+          <div *ngFor="let skill of result.skill_gap_details.slice(0, 3)" 
+               class="flex items-center justify-between text-xs p-2 rounded"
+               [class]="skill.gap >= 0 ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'">
+            <span class="truncate">{{ skill.skill_name }}</span>
+            <span class="font-medium">
+              {{ skill.actual_skill_level }}/{{ skill.required_skill_level }}
+              <span *ngIf="skill.gap > 0" class="text-green-600">+{{ skill.gap }}</span>
+              <span *ngIf="skill.gap < 0" class="text-red-600">{{ skill.gap }}</span>
+            </span>
+          </div>
+          <p *ngIf="result.skill_gap_details.length > 3" class="text-xs text-gray-500">
+            ... et {{ result.skill_gap_details.length - 3 }} autres compétences
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -61,4 +61,31 @@ export class MatchingService {
       responseType: 'blob'
     });
   }
+
+  // Nouvelle méthode pour trouver le meilleur poste pour un employé
+  findBestJobForEmployee(employeeId: number): Observable<MatchingResult[]> {
+    // On va tester l'employé contre tous les postes disponibles
+    return this.http.get<MatchingResult[]>(`${this.apiUrl}/employee/${employeeId}/best-matches`);
+  }
+
+  // Méthode alternative si le backend n'a pas l'endpoint spécifique
+  findBestJobForEmployeeAlternative(employeeId: number, jobDescriptions: any[]): Observable<MatchingResult[]> {
+    // On teste l'employé contre chaque poste et on retourne les résultats triés
+    const matchingPromises = jobDescriptions.map(job => 
+      this.getJobEmployeeSkillMatch(job.id).toPromise()
+        .then(results => (results ?? []).filter(result => result.employee_id === employeeId))
+
+        .catch(() => [])
+    );
+
+    return new Observable(observer => {
+      Promise.all(matchingPromises).then(allResults => {
+        const flatResults = allResults.flat().sort((a, b) => b.score - a.score);
+        observer.next(flatResults);
+        observer.complete();
+      }).catch(error => {
+        observer.error(error);
+      });
+    });
+  }
 }

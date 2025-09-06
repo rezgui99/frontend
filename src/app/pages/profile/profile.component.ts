@@ -1,10 +1,12 @@
+// profile.component.ts - Version améliorée
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { EmployeeService } from '../../services/employee.service';
 import { SkillService } from '../../services/skill.service';
-import { Employee, Skill, SkillType, SkillLevel } from '../../models/employee.model';
+import { EmployeeSkillService } from '../../services/employee-skill.service';
+import { Employee, Skill, SkillLevel } from '../../models/employee.model';
 
 @Component({
   selector: 'app-profile',
@@ -17,19 +19,26 @@ export class ProfileComponent implements OnInit {
   employee: Employee | null = null;
   profileForm: FormGroup;
   skills: Skill[] = [];
-  skillTypes: SkillType[] = [];
   skillLevels: SkillLevel[] = [];
+  
   loading: boolean = true;
   saving: boolean = false;
+  loadingSkills: boolean = false;
+  
   errorMessage: string | null = null;
   successMessage: string | null = null;
+  skillMessage: string | null = null;
+  
   isEditing: boolean = false;
+  selectedFile: File | null = null;
+  profileImagePreview: string | ArrayBuffer | null = null;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private employeeService: EmployeeService,
     private skillService: SkillService,
+    private employeeSkillService: EmployeeSkillService,
     private formBuilder: FormBuilder
   ) {
     this.profileForm = this.formBuilder.group({
@@ -40,6 +49,7 @@ export class ProfileComponent implements OnInit {
       phone: [''],
       gender: [''],
       location: [''],
+      department: [''],
       notes: [''],
       skills: this.formBuilder.array([])
     });
@@ -53,12 +63,10 @@ export class ProfileComponent implements OnInit {
     }
   }
 
-  get skillsFormArray(): FormArray {
-    return this.profileForm.get('skills') as FormArray;
-  }
-
   loadEmployee(id: number): void {
     this.loading = true;
+    this.errorMessage = null;
+    
     this.employeeService.getEmployeeById(id).subscribe({
       next: (employee) => {
         this.employee = employee;
@@ -74,17 +82,120 @@ export class ProfileComponent implements OnInit {
   }
 
   loadSkillsData(): void {
+    this.loadingSkills = true;
     Promise.all([
       this.skillService.getSkills().toPromise(),
-      this.skillService.getSkillTypes().toPromise(),
       this.skillService.getSkillLevels().toPromise()
-    ]).then(([skills, skillTypes, skillLevels]) => {
+    ]).then(([skills, skillLevels]) => {
       this.skills = skills || [];
-      this.skillTypes = skillTypes || [];
       this.skillLevels = skillLevels || [];
+      this.loadingSkills = false;
     }).catch(err => {
       console.error('Error loading skills data:', err);
+      this.loadingSkills = false;
     });
+  }
+
+  get skillsFormArray(): FormArray {
+    return this.profileForm.get('skills') as FormArray;
+  }
+
+  addSkillToForm(existingSkill?: any): void {
+    const skillGroup = this.formBuilder.group({
+      skill_id: [existingSkill?.skill_id || '', Validators.required],
+      actual_skill_level_id: [existingSkill?.actual_skill_level_id || '', Validators.required],
+      acquired_date: [existingSkill?.acquired_date || ''],
+      certification: [existingSkill?.certification || ''],
+      last_evaluated_date: [existingSkill?.last_evaluated_date || '']
+    });
+    this.skillsFormArray.push(skillGroup);
+  }
+
+  removeSkillFromForm(index: number): void {
+    this.skillsFormArray.removeAt(index);
+  }
+
+  clearSkillsArray(): void {
+    while (this.skillsFormArray.length !== 0) {
+      this.skillsFormArray.removeAt(0);
+    }
+  }
+
+  onFileSelected(event: any): void {
+    const file = event.target.files[0];
+    if (file) {
+      // Vérifier la taille du fichier (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.errorMessage = 'La taille du fichier ne doit pas dépasser 5MB.';
+        return;
+      }
+
+      // Vérifier le type de fichier
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        this.errorMessage = 'Seuls les fichiers JPG, PNG et GIF sont acceptés.';
+        return;
+      }
+
+      this.selectedFile = file;
+      this.errorMessage = null;
+      
+      // Aperçu de l'image
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.profileImagePreview = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeProfileImage(): void {
+    this.selectedFile = null;
+    this.profileImagePreview = null;
+    const fileInput = document.getElementById('profile_picture') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  }
+
+getProfileImage(): string {
+  // 1. Priorité à l'aperçu si on a sélectionné un nouveau fichier
+  if (this.profileImagePreview) {
+    return this.profileImagePreview as string;
+  }
+  
+  // 2. Utiliser l'image existante de l'employé
+  if (this.employee?.profile_picture) {
+    // Si l'URL est déjà complète (commence par http)
+    if (this.employee.profile_picture.startsWith('http')) {
+      return this.employee.profile_picture;
+    }
+    
+    // Si c'est une image base64
+    if (this.employee.profile_picture.startsWith('data:image')) {
+      return this.employee.profile_picture;
+    }
+    
+    // Construire l'URL complète - CORRECTION ICI
+    // Le backend stocke: "/uploads/profile-pictures/filename"
+    // On construit: "http://localhost:3000/uploads/profile-pictures/filename"
+    const baseUrl = 'http://localhost:3000';
+    const imagePath = this.employee.profile_picture.startsWith('/') ? 
+                     this.employee.profile_picture : 
+                     `/${this.employee.profile_picture}`;
+    
+    const fullUrl = `${baseUrl}${imagePath}`;
+    console.log('URL d\'image construite:', fullUrl);
+    return fullUrl;
+  }
+  
+  return '';
+}
+
+  hasProfileImage(): boolean {
+    return !!(this.profileImagePreview || 
+             (this.employee?.profile_picture && 
+              this.employee.profile_picture.trim() !== ''));
   }
 
   populateForm(): void {
@@ -98,61 +209,70 @@ export class ProfileComponent implements OnInit {
       phone: this.employee.phone || '',
       gender: this.employee.gender || '',
       location: this.employee.location || '',
+      department: this.employee.department || '',
       notes: this.employee.notes || ''
     });
 
-    // Populate skills
-    const skillsArray = this.profileForm.get('skills') as FormArray;
-    skillsArray.clear();
-    
-    if (this.employee.skills) {
-      this.employee.skills.forEach(empSkill => {
-        const skillGroup = this.formBuilder.group({
-          skill_id: [empSkill.skill_id, Validators.required],
-          actual_skill_level_id: [empSkill.actual_skill_level_id, Validators.required],
-          acquired_date: [empSkill.acquired_date || ''],
-          certification: [empSkill.certification || ''],
-          last_evaluated_date: [empSkill.last_evaluated_date || '']
-        });
-        skillsArray.push(skillGroup);
-      });
-    }
-  }
-
-  addSkill(): void {
-    const skillGroup = this.formBuilder.group({
-      skill_id: ['', Validators.required],
-      actual_skill_level_id: ['', Validators.required],
-      acquired_date: [''],
-      certification: [''],
-      last_evaluated_date: ['']
+    // Charger les compétences existantes
+    this.clearSkillsArray();
+    const employeeSkills = this.employee.skills || this.employee.EmployeeSkills || [];
+    employeeSkills.forEach(skill => {
+      this.addSkillToForm(skill);
     });
-    this.skillsFormArray.push(skillGroup);
-  }
-
-  removeSkill(index: number): void {
-    this.skillsFormArray.removeAt(index);
   }
 
   toggleEdit(): void {
     this.isEditing = !this.isEditing;
     if (!this.isEditing) {
+      this.selectedFile = null;
+      this.profileImagePreview = null;
       this.populateForm(); // Reset form if canceling edit
+      this.clearMessages();
     }
   }
 
   onSubmit(): void {
     if (this.profileForm.valid && this.employee) {
       this.saving = true;
-      this.errorMessage = null;
-      this.successMessage = null;
+      this.clearMessages();
 
-      const formData = this.profileForm.value;
+      const formValue = this.profileForm.value;
+      const formData = new FormData();
       
-      this.employeeService.updateEmployee(this.employee.id!, formData).subscribe({
+      // Données de base
+      formData.append('name', formValue.name);
+      formData.append('position', formValue.position);
+      formData.append('email', formValue.email);
+      formData.append('hire_date', formValue.hire_date);
+      formData.append('phone', formValue.phone || '');
+      formData.append('gender', formValue.gender || '');
+      formData.append('location', formValue.location || '');
+      formData.append('department', formValue.department || '');
+      formData.append('notes', formValue.notes || '');
+      
+      // Compétences
+      const skillsData = formValue.skills
+        .filter((skill: any) => skill.skill_id && skill.actual_skill_level_id)
+        .map((skill: any) => ({
+          skill_id: parseInt(skill.skill_id, 10),
+          actual_skill_level_id: parseInt(skill.actual_skill_level_id, 10),
+          acquired_date: skill.acquired_date || null,
+          certification: skill.certification || null,
+          last_evaluated_date: skill.last_evaluated_date || null
+        }));
+      formData.append('skills', JSON.stringify(skillsData));
+      
+      // Photo de profil
+      if (this.selectedFile) {
+        formData.append('profile_picture', this.selectedFile);
+      }
+      
+      this.employeeService.updateEmployeeWithFormData(this.employee.id!, formData).subscribe({
         next: (updatedEmployee) => {
           this.employee = updatedEmployee;
           this.isEditing = false;
+          this.selectedFile = null;
+          this.profileImagePreview = null;
           this.successMessage = 'Profil mis à jour avec succès.';
           this.saving = false;
           this.populateForm();
@@ -166,6 +286,7 @@ export class ProfileComponent implements OnInit {
     }
   }
 
+  // Méthodes pour les compétences
   getSkillName(skillId: number): string {
     const skill = this.skills.find(s => s.id === skillId);
     return skill ? skill.name : 'Compétence inconnue';
@@ -176,7 +297,55 @@ export class ProfileComponent implements OnInit {
     return level ? level.level_name : 'Niveau inconnu';
   }
 
+  getSkillLevelValue(levelId: number): number {
+    const level = this.skillLevels.find(l => l.id === levelId);
+    return level ? level.value : 0;
+  }
+
+  getSkillLevelClass(levelValue: number): string {
+    if (levelValue <= 1) return 'bg-red-100 text-red-800';
+    if (levelValue <= 2) return 'bg-yellow-100 text-yellow-800';
+    if (levelValue <= 3) return 'bg-blue-100 text-blue-800';
+    if (levelValue <= 4) return 'bg-green-100 text-green-800';
+    return 'bg-purple-100 text-purple-800';
+  }
+
+  // Méthodes utilitaires
   goBack(): void {
     this.router.navigate(['/employees']);
+  }
+
+  getFirstCharSafe(name: string | undefined): string {
+    if (!name || name.length === 0) return '?';
+    return name.charAt(0).toUpperCase();
+  }
+
+  formatDateSafe(dateString: string | null | undefined): string {
+    if (!dateString) return 'Non définie';
+    try {
+      return new Date(dateString).toLocaleDateString('fr-FR');
+    } catch {
+      return 'Date invalide';
+    }
+  }
+
+  clearMessages(): void {
+    this.errorMessage = null;
+    this.successMessage = null;
+    this.skillMessage = null;
+  }
+
+  // Méthodes sécurisées pour l'affichage des compétences
+  getEmployeeSkills(): any[] {
+    if (!this.employee) return [];
+    return this.employee.skills || this.employee.EmployeeSkills || [];
+  }
+
+  hasSkills(): boolean {
+    return this.getEmployeeSkills().length > 0;
+  }
+
+  getSkillsCount(): number {
+    return this.getEmployeeSkills().length;
   }
 }

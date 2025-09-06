@@ -35,6 +35,8 @@ export interface AireProximite {
 }
 
 export interface JobRequiredSkill {
+  level_name: string | undefined;
+  name: string | undefined;
   job_description_id: number;
   skill_id: number;
   skill?: Skill;

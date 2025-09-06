@@ -55,7 +55,38 @@ export class OrganigrammeComponent implements OnInit {
       this.loading = false;
     });
   }
+// Ajouter ces méthodes dans organigramme.component.ts
 
+// Méthode pour obtenir l'image de profil d'un employé
+getEmployeeProfileImage(employeeName: string): string {
+  const employee = this.employees.find(emp => emp.name === employeeName);
+  if (employee?.profile_picture) {
+    if (employee.profile_picture.startsWith('http')) {
+      return employee.profile_picture;
+    }
+    const baseUrl = 'http://localhost:3000';
+    const imagePath = employee.profile_picture.startsWith('/') ? 
+                     employee.profile_picture : 
+                     `/${employee.profile_picture}`;
+    return `${baseUrl}${imagePath}`;
+  }
+  return '';
+}
+
+// Méthode pour vérifier si un employé a une photo
+hasEmployeeProfileImage(employeeName: string): boolean {
+  const employee = this.employees.find(emp => emp.name === employeeName);
+  return !!(employee?.profile_picture && 
+           employee.profile_picture.trim() !== '' && 
+           !employee.profile_picture.includes('undefined') &&
+           !employee.profile_picture.includes('null'));
+}
+
+// Méthode pour obtenir les initiales
+getInitials(name: string): string {
+  if (!name || name === 'Poste vacant') return '?';
+  return name.charAt(0).toUpperCase();
+}
   buildOrgChart(): void {
     // Créer une map des fiches de poste avec leurs relations hiérarchiques
     const jobMap = new Map<number, JobDescription>();

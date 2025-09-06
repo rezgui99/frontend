@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { TooltipDirective } from '../../components/tooltip/tooltip.directive';
 import { JobDescriptionService } from '../../services/job-description.service';
 import { SkillService } from '../../services/skill.service';
 import { JobDescription } from '../../models/job-description.model';
@@ -10,7 +11,7 @@ import { Skill, SkillLevel } from '../../models/employee.model';
 @Component({
   selector: 'app-job-descriptions',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TooltipDirective],
   templateUrl: './job-descriptions.component.html',
   styleUrls: ['./job-descriptions.component.css']
 })
@@ -410,5 +411,13 @@ export class JobDescriptionsComponent implements OnInit {
 
   navigateToMatching(jobId: number): void {
     this.router.navigate(['/matching'], { queryParams: { jobId: jobId } });
+  }
+
+  createJobOffer(jobDescription: JobDescription): void {
+    console.log('Creating job offer for:', jobDescription);
+    console.log('Required skills:', jobDescription.requiredSkills);
+    this.router.navigate(['/job-offer/create'], { 
+      queryParams: { jobDescriptionId: jobDescription.id } 
+    });
   }
 }

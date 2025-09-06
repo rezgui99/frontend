@@ -5,6 +5,7 @@ import { EmployeeSkillService } from '../../services/employee-skill.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { SkillService, Skill, SkillLevel } from '../../services/skill.service';
 import { EmployeeSkill } from '../../models/employee-skill.model';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-employee-skills',

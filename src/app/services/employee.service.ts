@@ -21,11 +21,26 @@ export class EmployeeService {
     return this.http.get<Employee>(`${this.apiUrl}/${id}`);
   }
 
+  // Méthode pour créer un employé avec FormData (pour l'upload de fichier)
+  createEmployeeWithFormData(employeeData: FormData): Observable<Employee> {
+    console.log('Creating employee with FormData');
+    return this.http.post<Employee>(this.apiUrl, employeeData);
+  }
+
+  // Méthode pour mettre à jour un employé avec FormData (pour l'upload de fichier)
+  updateEmployeeWithFormData(id: number, employeeData: FormData): Observable<Employee> {
+    console.log('Updating employee with FormData');
+    return this.http.put<Employee>(`${this.apiUrl}/${id}`, employeeData);
+  }
+
+  // Méthodes originales conservées pour la compatibilité
   createEmployee(employee: Employee): Observable<Employee> {
+    console.log('Creating employee with data:', employee);
     return this.http.post<Employee>(this.apiUrl, employee);
   }
 
   updateEmployee(id: number, employee: Employee): Observable<Employee> {
+    console.log('Updating employee with data:', employee);
     return this.http.put<Employee>(`${this.apiUrl}/${id}`, employee);
   }
 
@@ -57,5 +72,3 @@ export class EmployeeService {
     return this.http.get<any[]>(`${this.jobDescriptionEmployeeUrl}`);
   }
 }
-
-export type { Employee };

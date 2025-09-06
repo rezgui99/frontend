@@ -1,6 +1,6 @@
 <div class="flex h-screen bg-light">
   <!-- Sidebar -->
-  <app-sidebar></app-sidebar>
+  <app-sidebar *ngIf="showSidebar"></app-sidebar>
 
   <!-- Main content -->
   <div class="flex-1 flex flex-col overflow-hidden">

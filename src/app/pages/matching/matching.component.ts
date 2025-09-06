@@ -8,12 +8,13 @@ import { MatchingService } from '../../services/matching.service';
 import { JobDescription } from '../../models/job-description.model';
 import { Employee } from '../../models/employee.model';
 import { MatchingResult } from '../../models/matching.model';
-import { EmployeeCardComponent } from '../../components/employee-card/employee-card.component';
+import { AnalyticsService } from '../../services/analytics.service';
+import { ApplicationSuccessPrediction } from '../../models/analytics.model';
 
 @Component({
   selector: 'app-matching',
   standalone: true,
-  imports: [CommonModule, FormsModule, EmployeeCardComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './matching.component.html',
   styleUrls: ['./matching.component.css']
 })
@@ -35,6 +36,11 @@ export class MatchingComponent implements OnInit {
   inverseMatchingErrorMessage: string | null = null;
   autoAssignmentMessage: string | null = null;
 
+  // Prédictions de succès
+  successPredictions: ApplicationSuccessPrediction[] = [];
+  loadingPredictions: boolean = false;
+  predictionsMessage: string | null = null;
+
   // Paramètres d'affectation automatique
   minScoreForAssignment: number = 70;
   maxAssignments: number = 5;
@@ -47,7 +53,8 @@ export class MatchingComponent implements OnInit {
   constructor(
     private jobDescriptionService: JobDescriptionService,
     private employeeService: EmployeeService,
-    private matchingService: MatchingService
+    private matchingService: MatchingService,
+    private analyticsService: AnalyticsService
   ) { }
 
   ngOnInit(): void {
@@ -88,6 +95,7 @@ export class MatchingComponent implements OnInit {
   onJobSelect(): void {
     this.matchingResults = [];
     this.matchingErrorMessage = null;
+    this.successPredictions = [];
   }
 
   onEmployeeSelect(): void {
@@ -104,17 +112,43 @@ export class MatchingComponent implements OnInit {
     this.loadingMatching = true;
     this.matchingErrorMessage = null;
     this.matchingResults = [];
+    this.successPredictions = [];
 
-    // Utilise le nouveau controller jobemployeeskillmatch
     this.matchingService.getJobEmployeeSkillMatch(this.selectedJobId).subscribe({
       next: (results) => {
-        this.matchingResults = results.sort((a, b) => b.score - a.score); // Sort by score descending
+        this.matchingResults = results.sort((a, b) => b.score - a.score);
+        this.calculateSuccessPredictions();
         this.loadingMatching = false;
       },
       error: (err) => {
         console.error('Error performing matching:', err);
         this.matchingErrorMessage = 'Erreur lors du calcul du matching. Vérifiez que le backend et FastAPI sont en cours d\'exécution.';
         this.loadingMatching = false;
+      }
+    });
+  }
+
+  calculateSuccessPredictions(): void {
+    if (!this.selectedJobId || this.matchingResults.length === 0) return;
+
+    this.loadingPredictions = true;
+    this.predictionsMessage = null;
+    this.successPredictions = [];
+
+    const predictions = this.matchingResults.slice(0, 5).map(result => ({
+      employee_id: result.employee_id,
+      job_description_id: this.selectedJobId!
+    }));
+
+    this.analyticsService.predictMultipleApplications(predictions).subscribe({
+      next: (predictions) => {
+        this.successPredictions = predictions;
+        this.loadingPredictions = false;
+      },
+      error: (err) => {
+        console.error('Error calculating predictions:', err);
+        this.predictionsMessage = 'Erreur lors du calcul des prédictions.';
+        this.loadingPredictions = false;
       }
     });
   }
@@ -129,18 +163,6 @@ export class MatchingComponent implements OnInit {
     this.inverseMatchingErrorMessage = null;
     this.inverseMatchingResults = [];
 
-    // For inverse matching, we iterate through all job descriptions
-    // and call the matching service for each job with the selected employee.
-    // This assumes the backend's /jobemployeeskillmatch/:jobId endpoint
-    // can handle a single employee's skills being matched against a job.
-    // If the backend's /calculate endpoint in FastAPI is used, it would be different.
-
-    // Current backend endpoint only takes jobId and returns all matching employees for that job.
-    // To do inverse matching, we need to call the matching for each job and filter results.
-    // This might be inefficient for a large number of jobs.
-    // A dedicated inverse matching endpoint on the backend would be ideal.
-
-    // For demonstration, we'll simulate by calling matching for all jobs and filtering.
     const promises: Observable<MatchingResult[]>[] = [];
     this.jobDescriptions.forEach(job => {
       if (job.id) {
@@ -148,13 +170,10 @@ export class MatchingComponent implements OnInit {
       }
     });
 
-    // Combine all observables and process results
-    // This is a simplified approach. A more robust solution would involve a backend endpoint
-    // specifically for inverse matching or a more complex client-side aggregation.
     Promise.all(promises.map(p => p.toPromise())).then(allResultsArrays => {
       const allResults: MatchingResult[] = [].concat(...allResultsArrays.filter(r => r !== undefined) as any);
       this.inverseMatchingResults = allResults.filter(result => result.employee_id === this.selectedEmployeeId)
-                                              .sort((a, b) => b.score - a.score); // Sort by score descending
+                                              .sort((a, b) => b.score - a.score);
       this.loadingInverseMatching = false;
     }).catch(err => {
       console.error('Error performing inverse matching:', err);
@@ -163,7 +182,6 @@ export class MatchingComponent implements OnInit {
     });
   }
 
-  // Nouvelle méthode pour l'affectation automatique
   performAutoAssignment(): void {
     if (!this.selectedJobId) {
       this.autoAssignmentMessage = 'Veuillez sélectionner une fiche de poste.';
@@ -193,7 +211,6 @@ export class MatchingComponent implements OnInit {
     this.loadingAutoAssignment = true;
     this.autoAssignmentMessage = null;
 
-    // Effectuer les affectations une par une
     const assignmentPromises = eligibleCandidates.map(candidate => {
       return this.employeeService.assignEmployeeToJobDescription(candidate.employee_id, this.selectedJobId!)
         .toPromise()
@@ -221,8 +238,6 @@ export class MatchingComponent implements OnInit {
 
       this.autoAssignmentMessage = message;
       this.loadingAutoAssignment = false;
-
-      // Recharger les employés pour voir les changements
       this.loadEmployees();
     }).catch(error => {
       console.error('Error during auto assignment:', error);
@@ -231,6 +246,7 @@ export class MatchingComponent implements OnInit {
     });
   }
 
+  // Méthodes utilitaires
   getEmployeeFromResult(result: MatchingResult): Employee {
     return this.employees.find(emp => emp.id === result.employee_id) || { 
       id: result.employee_id, 
@@ -243,5 +259,38 @@ export class MatchingComponent implements OnInit {
 
   getJobDescriptionFromResult(result: MatchingResult): JobDescription | undefined {
     return this.jobDescriptions.find(job => job.id === result.job_description_id);
+  }
+
+  getPredictionForEmployee(employeeId: number): ApplicationSuccessPrediction | undefined {
+    return this.successPredictions.find((p: ApplicationSuccessPrediction) => p.employee_id === employeeId);
+  }
+
+  getEmployeeNameFromPrediction(prediction: ApplicationSuccessPrediction): string {
+    const result = this.matchingResults.find(r => r.employee_id === prediction.employee_id);
+    return result ? this.getEmployeeFromResult(result).name : 'Employé inconnu';
+  }
+
+  getPredictionClass(probability: number): string {
+    if (probability >= 80) return 'text-green-600';
+    if (probability >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  }
+
+  getConfidenceClass(level: string): string {
+    switch (level) {
+      case 'high': return 'bg-green-100 text-green-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  }
+
+  getConfidenceLabel(level: string): string {
+    switch (level) {
+      case 'high': return 'Confiance élevée';
+      case 'medium': return 'Confiance moyenne';
+      case 'low': return 'Confiance faible';
+      default: return 'Confiance inconnue';
+    }
   }
 }

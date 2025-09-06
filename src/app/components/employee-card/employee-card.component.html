@@ -8,7 +8,7 @@
     <div class="flex flex-wrap gap-2 mt-2">
       <app-skill-badge *ngFor="let skill of (showAllSkills ? employee.skills : employee.skills.slice(0, 3))"
         [skill]="skill.skill?.name || 'N/A'"
-        [level]="skill.skill_level?.level_name || 'N/A'">
+        [level]="skill.SkillLevel?.level_name || 'N/A'">
       </app-skill-badge>
       <span *ngIf="!showAllSkills && employee.skills.length > 3" class="text-gray-500 text-sm">...</span>
     </div>

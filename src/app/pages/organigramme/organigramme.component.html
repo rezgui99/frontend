@@ -30,9 +30,17 @@
       <div *ngFor="let rootNode of orgChart" class="org-tree">
         <div class="org-node-container">
           <div [class]="'org-node ' + getNodeClass(rootNode.level)">
-            <div class="node-avatar">
-              {{ rootNode.name.charAt(0).toUpperCase() }}
-            </div>
+ <div class="node-avatar">
+    <!-- Image de profil si disponible -->
+    <img *ngIf="hasEmployeeProfileImage(rootNode.name)" 
+         [src]="getEmployeeProfileImage(rootNode.name)" 
+         [alt]="rootNode.name"
+         class="w-full h-full object-cover rounded-full">
+    <!-- Avatar par défaut -->
+    <span *ngIf="!hasEmployeeProfileImage(rootNode.name)">
+      {{ getInitials(rootNode.name) }}
+    </span>
+  </div>
             <div class="node-info">
               <h4 class="node-name">{{ rootNode.name }}</h4>
               <p class="node-position">{{ rootNode.position }}</p>

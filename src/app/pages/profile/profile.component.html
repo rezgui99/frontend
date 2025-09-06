@@ -1,3 +1,4 @@
+<!-- Debug button (à supprimer en production) -->
 <div class="p-6 max-w-4xl mx-auto">
   <div class="flex justify-between items-center mb-6">
     <div class="flex items-center">
@@ -8,13 +9,20 @@
       </button>
       <h2 class="text-3xl font-bold text-primary">Profil Employé</h2>
     </div>
-    <button *ngIf="!isEditing" (click)="toggleEdit()" class="btn btn-primary">
-      Modifier le profil
-    </button>
+    <div class="flex space-x-3">
+   
+      <button *ngIf="!isEditing " (click)="toggleEdit()" class="btn btn-primary">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+        </svg>
+        Modifier le profil
+      </button>
+    </div>
   </div>
 
   <div *ngIf="loading" class="text-center text-primary py-8">
-    Chargement du profil...
+    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <p class="mt-2">Chargement du profil...</p>
   </div>
 
   <div *ngIf="errorMessage" class="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
@@ -25,21 +33,27 @@
     {{ successMessage }}
   </div>
 
+
+  
+
   <div *ngIf="employee && !loading">
+   
+
     <!-- Profile Header -->
     <div class="card mb-6">
       <div class="flex items-center space-x-6">
         <div class="w-24 h-24 bg-primary rounded-full flex items-center justify-center text-white text-3xl font-bold">
-          {{ employee.name.charAt(0).toUpperCase() }}
+          {{ getFirstCharSafe(employee.name) }}
         </div>
         <div>
           <h3 class="text-2xl font-semibold text-dark">{{ employee.name }}</h3>
           <p class="text-lg text-gray-600">{{ employee.position }}</p>
           <p class="text-sm text-gray-500">{{ employee.email }}</p>
+          <p class="text-sm text-gray-500">Embauché le {{ formatDateSafe(employee.hire_date) }}</p>
         </div>
       </div>
     </div>
-
+    
     <!-- Profile Form -->
     <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
       <!-- Basic Information -->
@@ -102,76 +116,23 @@
         </div>
       </div>
 
-      <!-- Skills Section -->
-      <div class="card mb-6">
-        <div class="flex justify-between items-center mb-4">
-          <h4 class="text-xl font-semibold text-dark">Compétences</h4>
-          <button *ngIf="isEditing" type="button" (click)="addSkill()" class="btn btn-secondary">
-            Ajouter une compétence
-          </button>
-        </div>
-
-        <div *ngIf="skillsFormArray.length === 0" class="text-center text-gray-600 py-8">
-          Aucune compétence enregistrée.
-        </div>
-
-        <div formArrayName="skills" class="space-y-4">
-          <div *ngFor="let skillGroup of skillsFormArray.controls; let i = index" 
-               [formGroupName]="i" class="border rounded-lg p-4 bg-gray-50">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">Compétence *</label>
-                <select formControlName="skill_id" [disabled]="!isEditing"
-                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                        [class.bg-gray-100]="!isEditing">
-                  <option value="">Sélectionner une compétence</option>
-                  <option *ngFor="let skill of skills" [value]="skill.id">{{ skill.name }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">Niveau *</label>
-                <select formControlName="actual_skill_level_id" [disabled]="!isEditing"
-                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                        [class.bg-gray-100]="!isEditing">
-                  <option value="">Sélectionner un niveau</option>
-                  <option *ngFor="let level of skillLevels" [value]="level.id">{{ level.level_name }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">Date d'acquisition</label>
-                <input type="date" formControlName="acquired_date" [readonly]="!isEditing"
-                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                       [class.bg-gray-100]="!isEditing">
-              </div>
-              <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">Certification</label>
-                <input type="text" formControlName="certification" [readonly]="!isEditing"
-                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                       [class.bg-gray-100]="!isEditing">
-              </div>
-              <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">Dernière évaluation</label>
-                <input type="date" formControlName="last_evaluated_date" [readonly]="!isEditing"
-                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                       [class.bg-gray-100]="!isEditing">
-              </div>
-              <div class="flex items-end">
-                <button *ngIf="isEditing" type="button" (click)="removeSkill(i)" 
-                        class="btn bg-red-500 text-white hover:bg-red-600 w-full">
-                  Supprimer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Action Buttons -->
-      <div *ngIf="isEditing" class="flex justify-end space-x-4">
+      <div *ngIf="isEditing" class="flex justify-end space-x-4 pt-4 border-t">
         <button type="button" (click)="toggleEdit()" class="btn btn-secondary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
           Annuler
         </button>
         <button type="submit" [disabled]="!profileForm.valid || saving" class="btn btn-primary">
+          <svg *ngIf="!saving" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          <svg *ngIf="saving" class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
           <span *ngIf="!saving">Sauvegarder</span>
           <span *ngIf="saving">Sauvegarde...</span>
         </button>

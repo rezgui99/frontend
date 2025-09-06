@@ -1,42 +1,331 @@
-/* Profile specific styles */
-.profile-avatar {
-  width: 120px;
-  height: 120px;
+/* organigramme.component.css */
+.org-chart-container {
+  padding: 20px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.org-chart {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 100%;
+  padding: 20px;
+}
+
+.org-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 20px;
+}
+
+.org-node-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.org-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 15px;
+  margin: 10px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  min-width: 180px;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.org-node:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.org-node.small {
+  min-width: 140px;
+  padding: 10px;
+}
+
+/* Styles par niveau hiérarchique */
+.org-node.level-0 {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+
+.org-node.level-0 .node-avatar {
+  background: #ef4444;
+}
+
+.org-node.level-1 {
+  border-color: #f97316;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+}
+
+.org-node.level-1 .node-avatar {
+  background: #f97316;
+}
+
+.org-node.level-2 {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.org-node.level-2 .node-avatar {
+  background: #3b82f6;
+}
+
+.org-node.level-3 {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+}
+
+.org-node.level-3 .node-avatar {
+  background: #10b981;
+}
+
+.org-node.level-4 {
+  border-color: #6b7280;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+}
+
+.org-node.level-4 .node-avatar {
+  background: #6b7280;
+}
+
+/* Avatar styling */
+.node-avatar {
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2196F3, #1976D2);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 3rem;
   font-weight: bold;
-  margin-bottom: 1rem;
+  font-size: 24px;
+  margin-bottom: 10px;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: relative;
 }
 
-.skill-item {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 0.5rem;
+.node-avatar.small {
+  width: 45px;
+  height: 45px;
+  font-size: 18px;
+  margin-bottom: 8px;
 }
 
-.skill-level-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.875rem;
-  font-weight: 500;
+.node-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
-.level-1 { background-color: #fee2e2; color: #991b1b; }
-.level-2 { background-color: #fef3c7; color: #92400e; }
-.level-3 { background-color: #dbeafe; color: #1e40af; }
-.level-4 { background-color: #d1fae5; color: #065f46; }
-.level-5 { background-color: #e0e7ff; color: #3730a3; }
+/* Info du noeud */
+.node-info {
+  text-align: center;
+  max-width: 160px;
+}
 
-.readonly-field {
-  background-color: #f8f9fa;
-  border-color: #e9ecef;
-  cursor: not-allowed;
+.node-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+.node-name.small {
+  font-size: 12px;
+  margin: 0 0 2px 0;
+}
+
+.node-position {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0 0 2px 0;
+  line-height: 1.3;
+}
+
+.node-position.small {
+  font-size: 11px;
+}
+
+.node-email {
+  font-size: 10px;
+  color: #9ca3af;
+  margin: 0;
+  word-break: break-all;
+}
+
+/* Lignes de connexion */
+.connection-line {
+  width: 2px;
+  height: 30px;
+  background-color: #d1d5db;
+  margin: 0 auto;
+}
+
+.children-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+}
+
+.child-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.branch-line {
+  width: 2px;
+  height: 30px;
+  background-color: #d1d5db;
+  margin-bottom: 0;
+}
+
+/* Ligne horizontale pour connecter les frères et sœurs */
+.children-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  right: 50%;
+  height: 2px;
+  background-color: #d1d5db;
+  z-index: 1;
+}
+
+.children-container .child-branch:first-child .branch-line::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 100vw;
+  height: 2px;
+  background-color: #d1d5db;
+}
+
+/* Sub-children styling */
+.sub-children-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.sub-connection-line {
+  width: 2px;
+  height: 20px;
+  background-color: #d1d5db;
+  margin-bottom: 10px;
+}
+
+.sub-children-grid {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sub-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sub-branch-line {
+  width: 2px;
+  height: 20px;
+  background-color: #d1d5db;
+  margin-bottom: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .org-chart {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .children-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .sub-children-grid {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .org-node {
+    min-width: 150px;
+  }
+  
+  .org-node.small {
+    min-width: 120px;
+  }
+}
+
+/* Animation pour l'apparition des noeuds */
+.org-node {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Style spécial pour les postes vacants */
+.org-node:has(.node-name:contains("Poste vacant")) {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.org-node:has(.node-name:contains("Poste vacant")) .node-avatar {
+  background: #9ca3af;
+}
+
+/* Tooltip pour les informations supplémentaires */
+.org-node::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.org-node:hover::after {
+  opacity: 1;
+  visibility: visible;
+  bottom: calc(100% + 10px);
 }

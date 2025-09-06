@@ -7,10 +7,13 @@ export interface Employee {
   phone?: string;
   gender?: string;
   location?: string;
+  department?: string;
   notes?: string;
   job_description_id?: number | null;
   jobDescription?: JobDescriptionBasic;
   skills?: EmployeeSkill[];
+  profile_picture?: string; 
+  EmployeeSkills?: EmployeeSkill[]; // Alternative property name from backend
   createdAt?: string;
   updatedAt?: string;
 }

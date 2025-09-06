@@ -1,0 +1,78 @@
+/* Advanced analytics styles */
+.chart-container {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+
+.stat-card {
+  transition: transform 0.2s ease-in-out;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.tab-active {
+  border-bottom-color: #2196F3;
+  color: #2196F3;
+}
+
+.tab-inactive {
+  border-bottom-color: transparent;
+  color: #6b7280;
+}
+
+.tab-inactive:hover {
+  color: #374151;
+  border-bottom-color: #d1d5db;
+}
+
+/* Responsive charts */
+@media (max-width: 768px) {
+  .chart-container {
+    height: 250px;
+  }
+}
+
+/* Animation pour les barres de progression */
+.progress-bar {
+  transition: width 0.8s ease-in-out;
+}
+
+/* Styles pour les métriques */
+.metric-card {
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Styles pour les tableaux */
+.analytics-table {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.analytics-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Styles pour les filtres */
+.filter-section {
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border: 1px solid #dbeafe;
+}
+
+/* Loading animations */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.loading-pulse {
+  animation: pulse-slow 2s infinite;
+}
