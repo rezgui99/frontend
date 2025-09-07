@@ -1,13 +1,22 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { 
+import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
+import { Observable, BehaviorSubject, throwError } from 'rxjs';
+import { map, catchError, retry, shareReplay, tap } from 'rxjs/operators';
+import {
   AnalyticsOverview,
+  AdvancedDashboard,
   DepartmentStatistics,
   EmployeeSkillRecommendation,
   ApplicationSuccessPrediction,
   AnalyticsFilters,
-  SkillDemand
+  SkillDemand,
+  ContractTypeStatistics,
+  AIReportRequest,
+  AIReportResponse,
+  SystemHealth,
+  RealtimeStats,
+  AlertThresholds,
+  ExportOptions
 } from '../models/analytics.model';
 import { environment } from '../../environments/environment';
 
@@ -16,93 +25,370 @@ import { environment } from '../../environments/environment';
 })
 export class AnalyticsService {
   private apiUrl = `${environment.backendUrl}/analytics`;
+  
+  // State management avec BehaviorSubject
+  private loadingSubject = new BehaviorSubject<boolean>(false);
+  private errorSubject = new BehaviorSubject<string | null>(null);
+  private dashboardSubject = new BehaviorSubject<AdvancedDashboard | null>(null);
+  
+  // Observables publics
+  public loading$ = this.loadingSubject.asObservable();
+  public error$ = this.errorSubject.asObservable();
+  public dashboard$ = this.dashboardSubject.asObservable();
+  
+  // Cache pour les données
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) {
+    this.initializeErrorHandling();
+  }
 
-  // Statistiques générales
+  // === GESTION D'ÉTAT ===
+  setLoading(loading: boolean): void {
+    this.loadingSubject.next(loading);
+  }
+
+  setError(error: string | null): void {
+    this.errorSubject.next(error);
+  }
+
+  clearError(): void {
+    this.errorSubject.next(null);
+  }
+
+  // === ANALYTICS DE BASE ===
   getAnalyticsOverview(filters?: AnalyticsFilters): Observable<AnalyticsOverview> {
-    let params = new HttpParams();
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        const value = (filters as any)[key];
-        if (value) params = params.set(key, value);
-      });
-    }
-    return this.http.get<AnalyticsOverview>(`${this.apiUrl}/overview`, { params });
+    const cacheKey = `overview_${JSON.stringify(filters || {})}`;
+    
+    return this.getCachedOrFetch(cacheKey, () => {
+      let params = this.buildHttpParams(filters);
+      return this.http.get<AnalyticsOverview>(`${this.apiUrl}/overview`, { params });
+    });
   }
 
-  // Statistiques par département
   getDepartmentStatistics(filters?: AnalyticsFilters): Observable<DepartmentStatistics[]> {
-    let params = new HttpParams();
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        const value = (filters as any)[key];
-        if (value) params = params.set(key, value);
-      });
-    }
-    return this.http.get<DepartmentStatistics[]>(`${this.apiUrl}/departments`, { params });
+    const cacheKey = `departments_${JSON.stringify(filters || {})}`;
+    
+    return this.getCachedOrFetch(cacheKey, () => {
+      let params = this.buildHttpParams(filters);
+      return this.http.get<DepartmentStatistics[]>(`${this.apiUrl}/departments`, { params });
+    });
   }
 
+  getContractTypeStatistics(filters?: AnalyticsFilters): Observable<ContractTypeStatistics[]> {
+    const cacheKey = `contracts_${JSON.stringify(filters || {})}`;
+    
+    return this.getCachedOrFetch(cacheKey, () => {
+      let params = this.buildHttpParams(filters);
+      return this.http.get<ContractTypeStatistics[]>(`${this.apiUrl}/contract-types`, { params });
+    });
+  }
 
-
-  // Compétences en demande
   getSkillsDemandAnalysis(filters?: AnalyticsFilters): Observable<SkillDemand[]> {
-    let params = new HttpParams();
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        const value = (filters as any)[key];
-        if (value) params = params.set(key, value);
-      });
-    }
-    return this.http.get<SkillDemand[]>(`${this.apiUrl}/skills-demand`, { params });
+    const cacheKey = `skills_${JSON.stringify(filters || {})}`;
+    
+    return this.getCachedOrFetch(cacheKey, () => {
+      let params = this.buildHttpParams(filters);
+      return this.http.get<SkillDemand[]>(`${this.apiUrl}/skills-demand`, { params });
+    });
   }
 
-  // Recommandations de compétences pour un employé
+  // === DASHBOARD AVANCÉ ===
+  getAdvancedDashboard(filters?: AnalyticsFilters): Observable<AdvancedDashboard> {
+    this.setLoading(true);
+    this.clearError();
+    
+    const cacheKey = `dashboard_${JSON.stringify(filters || {})}`;
+    
+    return this.getCachedOrFetch(cacheKey, () => {
+      let params = this.buildHttpParams(filters);
+      return this.http.get<AdvancedDashboard>(`${this.apiUrl}/dashboard`, { params });
+    }).pipe(
+      tap(data => {
+        this.dashboardSubject.next(data);
+        this.setLoading(false);
+      }),
+      catchError(error => {
+        this.setError('Erreur lors du chargement du dashboard');
+        this.setLoading(false);
+        return throwError(error);
+      })
+    );
+  }
+
+  // === RECOMMANDATIONS ===
   getEmployeeSkillRecommendations(employeeId: number): Observable<EmployeeSkillRecommendation> {
-    return this.http.get<EmployeeSkillRecommendation>(`${this.apiUrl}/employee/${employeeId}/recommendations`);
+    const cacheKey = `recommendations_${employeeId}`;
+    
+    return this.getCachedOrFetch(cacheKey, () => {
+      return this.http.get<EmployeeSkillRecommendation>(`${this.apiUrl}/employee/${employeeId}/recommendations`);
+    }, 10 * 60 * 1000); // Cache plus long pour les recommandations
   }
 
-  // Recommandations pour tous les employés
   getAllEmployeesRecommendations(filters?: AnalyticsFilters): Observable<EmployeeSkillRecommendation[]> {
-    let params = new HttpParams();
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        const value = (filters as any)[key];
-        if (value) params = params.set(key, value);
-      });
-    }
-    return this.http.get<EmployeeSkillRecommendation[]>(`${this.apiUrl}/employees/recommendations`, { params });
+    let params = this.buildHttpParams(filters);
+    return this.http.get<EmployeeSkillRecommendation[]>(`${this.apiUrl}/employees/recommendations`, { params })
+      .pipe(
+        retry(2),
+        catchError(this.handleError)
+      );
   }
 
-  // Prédiction de succès pour une candidature
+  // === PRÉDICTIONS ===
   predictApplicationSuccess(employeeId: number, jobDescriptionId: number): Observable<ApplicationSuccessPrediction> {
     return this.http.post<ApplicationSuccessPrediction>(`${this.apiUrl}/predict-success`, {
       employee_id: employeeId,
       job_description_id: jobDescriptionId
-    });
+    }).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  // Prédictions en lot
-  predictMultipleApplications(predictions: Array<{employee_id: number, job_description_id: number}>): Observable<ApplicationSuccessPrediction[]> {
+  predictMultipleApplications(
+    predictions: Array<{employee_id: number, job_description_id: number}>
+  ): Observable<ApplicationSuccessPrediction[]> {
     return this.http.post<ApplicationSuccessPrediction[]>(`${this.apiUrl}/predict-success/batch`, {
       predictions
-    });
+    }).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  // Export des données analytics
-  exportAnalyticsReport(format: 'pdf' | 'excel' | 'csv', filters?: AnalyticsFilters): Observable<Blob> {
-    let params = new HttpParams().set('format', format);
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        const value = (filters as any)[key];
-        if (value) params = params.set(key, value);
-      });
+  // === RAPPORTS IA ===
+  generateAIReport(request: AIReportRequest): Observable<Blob> {
+    this.setLoading(true);
+    
+    let params = new HttpParams()
+      .set('reportType', request.reportType)
+      .set('includeRecommendations', request.includeRecommendations.toString());
+
+    if (request.filters) {
+      params = this.buildHttpParams(request.filters, params);
     }
+
+    if (request.employeeId) {
+      params = params.set('employeeId', request.employeeId.toString());
+    }
+
+    return this.http.get(`${this.apiUrl}/reports/ai-generated`, {
+      params,
+      responseType: 'blob'
+    }).pipe(
+      tap(() => this.setLoading(false)),
+      catchError(error => {
+        this.setError('Erreur lors de la génération du rapport IA');
+        this.setLoading(false);
+        return throwError(error);
+      })
+    );
+  }
+
+  generatePersonalizedReport(employeeId: number): Observable<Blob> {
+    this.setLoading(true);
+    
+    return this.http.get(`${this.apiUrl}/employee/${employeeId}/ai-report`, {
+      responseType: 'blob'
+    }).pipe(
+      tap(() => this.setLoading(false)),
+      catchError(error => {
+        this.setError('Erreur lors de la génération du rapport personnalisé');
+        this.setLoading(false);
+        return throwError(error);
+      })
+    );
+  }
+
+  // === DONNÉES EN TEMPS RÉEL ===
+  getRealtimeStats(): Observable<RealtimeStats> {
+    return this.http.get<RealtimeStats>(`${this.apiUrl}/realtime`)
+      .pipe(catchError(this.handleError));
+  }
+
+  getSystemHealth(): Observable<SystemHealth> {
+    return this.http.get<SystemHealth>(`${this.apiUrl}/health`)
+      .pipe(catchError(this.handleError));
+  }
+
+  // === CONFIGURATION ===
+  getAlertThresholds(): Observable<AlertThresholds> {
+    return this.http.get<AlertThresholds>(`${this.apiUrl}/config/thresholds`)
+      .pipe(catchError(this.handleError));
+  }
+
+  updateAlertThresholds(thresholds: AlertThresholds): Observable<any> {
+    return this.http.put(`${this.apiUrl}/config/thresholds`, thresholds)
+      .pipe(catchError(this.handleError));
+  }
+
+  // === EXPORT ===
+  exportAnalyticsReport(options: ExportOptions): Observable<Blob> {
+    let params = new HttpParams()
+      .set('format', options.format)
+      .set('type', options.type);
+
+    if (options.filters) {
+      params = this.buildHttpParams(options.filters, params);
+    }
+
     return this.http.get(`${this.apiUrl}/export`, {
       params,
       responseType: 'blob'
-    });
+    }).pipe(
+      catchError(this.handleError)
+    );
   }
 
- 
+  // === GESTION DU CACHE ===
+  private getCachedOrFetch<T>(
+    key: string, 
+    fetchFn: () => Observable<T>, 
+    ttl: number = this.defaultTTL
+  ): Observable<T> {
+    const cached = this.cache.get(key);
+    
+    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      return new Observable(observer => {
+        observer.next(cached.data);
+        observer.complete();
+      });
+    }
+
+    return fetchFn().pipe(
+      tap(data => {
+        this.cache.set(key, {
+          data,
+          timestamp: Date.now(),
+          ttl
+        });
+      }),
+      shareReplay(1),
+      catchError(this.handleError)
+    );
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  invalidateCache(pattern?: string): void {
+    if (!pattern) {
+      this.clearCache();
+      return;
+    }
+
+    const keysToDelete: string[] = [];
+    this.cache.forEach((value, key) => {
+      if (key.includes(pattern)) {
+        keysToDelete.push(key);
+      }
+    });
+
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+
+  // === UTILITAIRES ===
+  private buildHttpParams(filters?: AnalyticsFilters, params?: HttpParams): HttpParams {
+    if (!params) {
+      params = new HttpParams();
+    }
+
+    if (filters) {
+      Object.keys(filters).forEach(key => {
+        const value = (filters as any)[key];
+        if (value !== undefined && value !== null && value !== '') {
+          params = params!.set(key, value.toString());
+        }
+      });
+    }
+
+    return params;
+  }
+
+  private handleError = (error: any): Observable<never> => {
+    console.error('Analytics service error:', error);
+    
+    let errorMessage = 'Une erreur est survenue';
+    
+    if (error.error instanceof ErrorEvent) {
+      // Erreur côté client
+      errorMessage = `Erreur: ${error.error.message}`;
+    } else {
+      // Erreur côté serveur
+      switch (error.status) {
+        case 400:
+          errorMessage = 'Requête invalide';
+          break;
+        case 401:
+          errorMessage = 'Non autorisé';
+          break;
+        case 403:
+          errorMessage = 'Accès interdit';
+          break;
+        case 404:
+          errorMessage = 'Ressource non trouvée';
+          break;
+        case 500:
+          errorMessage = 'Erreur serveur interne';
+          break;
+        default:
+          errorMessage = `Erreur ${error.status}: ${error.message}`;
+      }
+    }
+
+    this.setError(errorMessage);
+    return throwError(errorMessage);
+  };
+
+  private initializeErrorHandling(): void {
+    // Nettoyage automatique du cache toutes les heures
+    setInterval(() => {
+      const now = Date.now();
+      const keysToDelete: string[] = [];
+      
+      this.cache.forEach((value, key) => {
+        if ((now - value.timestamp) > value.ttl) {
+          keysToDelete.push(key);
+        }
+      });
+      
+      keysToDelete.forEach(key => this.cache.delete(key));
+    }, 60 * 60 * 1000); // 1 heure
+  }
+
+  // === HELPERS POUR LES COMPOSANTS ===
+  downloadBlob(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  formatPercentage(value: number): string {
+    return `${Math.round(value * 10) / 10}%`;
+  }
+
+  formatCurrency(value: number, currency: string = 'EUR'): string {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: currency
+    }).format(value);
+  }
+
+  getColorByScore(score: number): string {
+    if (score >= 80) return '#10B981'; // Vert
+    if (score >= 60) return '#F59E0B'; // Orange
+    if (score >= 40) return '#EF4444'; // Rouge
+    return '#6B7280'; // Gris
+  }
+
+  getScoreLabel(score: number): string {
+    if (score >= 85) return 'Excellent';
+    if (score >= 70) return 'Bon';
+    if (score >= 50) return 'Moyen';
+    if (score >= 30) return 'Faible';
+    return 'Critique';
+  }
 }

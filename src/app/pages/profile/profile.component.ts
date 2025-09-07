@@ -158,39 +158,18 @@ export class ProfileComponent implements OnInit {
     }
   }
 
-getProfileImage(): string {
-  // 1. Priorité à l'aperçu si on a sélectionné un nouveau fichier
-  if (this.profileImagePreview) {
-    return this.profileImagePreview as string;
-  }
-  
-  // 2. Utiliser l'image existante de l'employé
-  if (this.employee?.profile_picture) {
-    // Si l'URL est déjà complète (commence par http)
-    if (this.employee.profile_picture.startsWith('http')) {
-      return this.employee.profile_picture;
+  getProfileImage(): string {
+    if (this.profileImagePreview) {
+      return this.profileImagePreview as string;
     }
-    
-    // Si c'est une image base64
-    if (this.employee.profile_picture.startsWith('data:image')) {
-      return this.employee.profile_picture;
+    if (this.employee?.profile_picture) {
+      if (this.employee.profile_picture.startsWith('http')) {
+        return this.employee.profile_picture;
+      }
+      return `http://localhost:3000${this.employee.profile_picture}`;
     }
-    
-    // Construire l'URL complète - CORRECTION ICI
-    // Le backend stocke: "/uploads/profile-pictures/filename"
-    // On construit: "http://localhost:3000/uploads/profile-pictures/filename"
-    const baseUrl = 'http://localhost:3000';
-    const imagePath = this.employee.profile_picture.startsWith('/') ? 
-                     this.employee.profile_picture : 
-                     `/${this.employee.profile_picture}`;
-    
-    const fullUrl = `${baseUrl}${imagePath}`;
-    console.log('URL d\'image construite:', fullUrl);
-    return fullUrl;
+    return '';
   }
-  
-  return '';
-}
 
   hasProfileImage(): boolean {
     return !!(this.profileImagePreview || 

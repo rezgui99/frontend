@@ -1,5 +1,4 @@
-<!-- Debug button (à supprimer en production) -->
-<div class="p-6 max-w-4xl mx-auto">
+<div class="p-6 max-w-6xl mx-auto">
   <div class="flex justify-between items-center mb-6">
     <div class="flex items-center">
       <button (click)="goBack()" class="mr-4 text-primary hover:text-blue-700">
@@ -10,8 +9,7 @@
       <h2 class="text-3xl font-bold text-primary">Profil Employé</h2>
     </div>
     <div class="flex space-x-3">
-   
-      <button *ngIf="!isEditing " (click)="toggleEdit()" class="btn btn-primary">
+      <button *ngIf="!isEditing" (click)="toggleEdit()" class="btn btn-primary">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
         </svg>
@@ -20,6 +18,7 @@
     </div>
   </div>
 
+  <!-- Messages -->
   <div *ngIf="loading" class="text-center text-primary py-8">
     <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     <p class="mt-2">Chargement du profil...</p>
@@ -33,56 +32,114 @@
     {{ successMessage }}
   </div>
 
-
-  
-
   <div *ngIf="employee && !loading">
-   
-
+    
     <!-- Profile Header -->
     <div class="card mb-6">
       <div class="flex items-center space-x-6">
-        <div class="w-24 h-24 bg-primary rounded-full flex items-center justify-center text-white text-3xl font-bold">
-          {{ getFirstCharSafe(employee.name) }}
+        <!-- Photo de profil actuelle -->
+        <div class="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-300 bg-gray-100 flex items-center justify-center">
+          <img *ngIf="hasProfileImage()" 
+               [src]="getProfileImage()" 
+               [alt]="employee.name" 
+               class="w-full h-full object-cover">
+          <div *ngIf="!hasProfileImage()" 
+               class="w-full h-full bg-primary flex items-center justify-center text-white text-3xl font-bold">
+            {{ getFirstCharSafe(employee.name) }}
+          </div>
         </div>
         <div>
           <h3 class="text-2xl font-semibold text-dark">{{ employee.name }}</h3>
           <p class="text-lg text-gray-600">{{ employee.position }}</p>
           <p class="text-sm text-gray-500">{{ employee.email }}</p>
           <p class="text-sm text-gray-500">Embauché le {{ formatDateSafe(employee.hire_date) }}</p>
+          <p class="text-sm text-gray-500" *ngIf="hasSkills()">{{ getSkillsCount() }} compétence(s)</p>
         </div>
       </div>
     </div>
     
     <!-- Profile Form -->
     <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
-      <!-- Basic Information -->
+      
+      <!-- Photo de profil - Section d'édition -->
+      <div *ngIf="isEditing" class="card mb-6">
+        <h4 class="text-xl font-semibold text-dark mb-4">📸 Photo de Profil</h4>
+        <div class="flex items-center space-x-6">
+          <div class="relative">
+            <div class="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-300 bg-gray-100 flex items-center justify-center">
+              <img *ngIf="hasProfileImage()" 
+                   [src]="getProfileImage()" 
+                   alt="Aperçu photo de profil" 
+                   class="w-full h-full object-cover">
+              <div *ngIf="!hasProfileImage()" 
+                   class="text-2xl font-bold text-gray-400">
+                {{ getFirstCharSafe(profileForm.get('name')?.value) || getFirstCharSafe(employee.name) }}
+              </div>
+            </div>
+            <button *ngIf="hasProfileImage()" 
+                    type="button" 
+                    (click)="removeProfileImage()" 
+                    class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Changer la photo</label>
+            <input type="file" 
+                   id="profile_picture" 
+                   accept="image/*" 
+                   (change)="onFileSelected($event)" 
+                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <p class="text-xs text-gray-500 mt-1">Formats acceptés: JPG, PNG, GIF. Taille max: 5MB</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Informations personnelles -->
       <div class="card mb-6">
-        <h4 class="text-xl font-semibold text-dark mb-4">Informations personnelles</h4>
+        <h4 class="text-xl font-semibold text-dark mb-4">📋 Informations Personnelles</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">Nom complet *</label>
             <input type="text" formControlName="name" [readonly]="!isEditing"
                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                    [class.bg-gray-100]="!isEditing">
+            <div *ngIf="profileForm.get('name')?.invalid && profileForm.get('name')?.touched && isEditing" 
+                 class="text-red-500 text-xs mt-1">
+              Nom requis (minimum 3 caractères)
+            </div>
           </div>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">Poste *</label>
             <input type="text" formControlName="position" [readonly]="!isEditing"
                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                    [class.bg-gray-100]="!isEditing">
+            <div *ngIf="profileForm.get('position')?.invalid && profileForm.get('position')?.touched && isEditing" 
+                 class="text-red-500 text-xs mt-1">
+              Poste requis
+            </div>
           </div>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">Email *</label>
             <input type="email" formControlName="email" [readonly]="!isEditing"
                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                    [class.bg-gray-100]="!isEditing">
+            <div *ngIf="profileForm.get('email')?.invalid && profileForm.get('email')?.touched && isEditing" 
+                 class="text-red-500 text-xs mt-1">
+              Email valide requis
+            </div>
           </div>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">Date d'embauche *</label>
             <input type="date" formControlName="hire_date" [readonly]="!isEditing"
                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                    [class.bg-gray-100]="!isEditing">
+            <div *ngIf="profileForm.get('hire_date')?.invalid && profileForm.get('hire_date')?.touched && isEditing" 
+                 class="text-red-500 text-xs mt-1">
+              Date d'embauche requise
+            </div>
           </div>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">Téléphone</label>
@@ -107,6 +164,22 @@
                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                    [class.bg-gray-100]="!isEditing">
           </div>
+          <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Département</label>
+            <select formControlName="department" [disabled]="!isEditing"
+                    class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    [class.bg-gray-100]="!isEditing">
+              <option value="">Sélectionner un département</option>
+              <option value="Développement">Développement</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Ressources Humaines">Ressources Humaines</option>
+              <option value="Finance">Finance</option>
+              <option value="Commercial">Commercial</option>
+              <option value="Support">Support</option>
+              <option value="Direction">Direction</option>
+              <option value="Production">Production</option>
+            </select>
+          </div>
           <div class="md:col-span-2">
             <label class="block text-gray-700 text-sm font-bold mb-2">Notes</label>
             <textarea formControlName="notes" rows="3" [readonly]="!isEditing"
@@ -116,6 +189,103 @@
         </div>
       </div>
 
+      <!-- Section Compétences -->
+      <div class="card mb-6">
+        <div class="flex justify-between items-center mb-4">
+          <h4 class="text-xl font-semibold text-dark">🎯 Compétences</h4>
+          <button *ngIf="isEditing" type="button" (click)="addSkillToForm()" class="btn btn-secondary">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Ajouter une compétence
+          </button>
+        </div>
+
+        <!-- Vue lecture seule des compétences -->
+        <div *ngIf="!isEditing" class="space-y-3">
+          <div *ngIf="!hasSkills()" class="text-center text-gray-500 py-8">
+            <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+            </svg>
+            <p>Aucune compétence enregistrée</p>
+          </div>
+          
+          <div *ngIf="hasSkills()" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div *ngFor="let skill of getEmployeeSkills()" 
+                 class="border rounded-lg p-4 bg-gray-50">
+              <div class="flex justify-between items-start mb-2">
+                <h5 class="font-semibold text-gray-900">{{ getSkillName(skill.skill_id) }}</h5>
+                <span [class]="'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ' + getSkillLevelClass(getSkillLevelValue(skill.actual_skill_level_id))">
+                  {{ getSkillLevelName(skill.actual_skill_level_id) }}
+                </span>
+              </div>
+              <div class="text-sm text-gray-600 space-y-1">
+                <p *ngIf="skill.acquired_date"><strong>Acquise le :</strong> {{ formatDateSafe(skill.acquired_date) }}</p>
+                <p *ngIf="skill.certification"><strong>Certification :</strong> {{ skill.certification }}</p>
+                <p *ngIf="skill.last_evaluated_date"><strong>Dernière évaluation :</strong> {{ formatDateSafe(skill.last_evaluated_date) }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vue édition des compétences -->
+        <div *ngIf="isEditing" formArrayName="skills" class="space-y-4">
+          <div *ngFor="let skillGroup of skillsFormArray.controls; let i = index" 
+               [formGroupName]="i" class="border rounded-lg p-4 bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Compétence *</label>
+                <select formControlName="skill_id" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="">Sélectionner une compétence</option>
+                  <option *ngFor="let skill of skills" [value]="skill.id">{{ skill.name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Niveau *</label>
+                <select formControlName="actual_skill_level_id" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="">Sélectionner un niveau</option>
+                  <option *ngFor="let level of skillLevels" [value]="level.id">{{ level.level_name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Date d'acquisition</label>
+                <input type="date" formControlName="acquired_date" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+              </div>
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Certification</label>
+                <input type="text" formControlName="certification" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                       placeholder="Nom de la certification">
+              </div>
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Dernière évaluation</label>
+                <input type="date" formControlName="last_evaluated_date" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+              </div>
+              <div class="flex items-end">
+                <button type="button" (click)="removeSkillFromForm(i)" 
+                        class="btn bg-red-500 text-white hover:bg-red-600 w-full">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div *ngIf="skillsFormArray.length === 0" class="text-center text-gray-500 py-8 border-2 border-dashed border-gray-300 rounded-lg">
+            <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+            </svg>
+            <p>Aucune compétence ajoutée</p>
+            <p class="text-sm text-gray-400 mt-1">Cliquez sur "Ajouter une compétence" pour commencer</p>
+          </div>
+        </div>
+      </div>
 
       <!-- Action Buttons -->
       <div *ngIf="isEditing" class="flex justify-end space-x-4 pt-4 border-t">

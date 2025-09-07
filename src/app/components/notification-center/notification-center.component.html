@@ -1,0 +1,144 @@
+<!-- Bouton de notification avec badge -->
+<div class="relative">
+  <button (click)="toggleNotificationPanel()" 
+          class="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary rounded-full transition-colors duration-200">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-3.5-3.5a8.38 8.38 0 010-11.8L20 2H15m-6 15v2a2 2 0 11-4 0v-2m4 0H9m6 0a2 2 0 11-4 0m4 0v2a2 2 0 11-4 0v-2m4 0H9"></path>
+    </svg>
+    
+    <!-- Badge de notifications non lues -->
+    <span *ngIf="unreadCount > 0" 
+          class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold animate-pulse">
+      {{ unreadCount > 99 ? '99+' : unreadCount }}
+    </span>
+  </button>
+
+  <!-- Panneau de notifications -->
+  <div *ngIf="isOpen" 
+       class="absolute right-0 top-12 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-96 overflow-hidden">
+    
+    <!-- Header du panneau -->
+    <div class="bg-primary text-white p-4 rounded-t-lg">
+      <div class="flex justify-between items-center">
+        <div>
+          <h3 class="font-semibold">Notifications</h3>
+          <p class="text-xs text-blue-100">{{ unreadCount }} non lue(s)</p>
+        </div>
+        <div class="flex space-x-2">
+          <button (click)="markAllAsRead()" 
+                  class="text-white hover:text-blue-200 transition-colors duration-150"
+                  title="Marquer tout comme lu">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </button>
+          <button (click)="clearAll()" 
+                  class="text-white hover:text-blue-200 transition-colors duration-150"
+                  title="Supprimer toutes les notifications">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+          </button>
+          <button (click)="toggleNotificationPanel()" 
+                  class="text-white hover:text-blue-200 transition-colors duration-150"
+                  title="Fermer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Liste des notifications -->
+    <div class="max-h-80 overflow-y-auto">
+      <div *ngIf="notifications.length === 0" class="p-8 text-center text-gray-500">
+        <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-3.5-3.5a8.38 8.38 0 010-11.8L20 2H15m-6 15v2a2 2 0 11-4 0v-2m4 0H9m6 0a2 2 0 11-4 0m4 0v2a2 2 0 11-4 0v-2m4 0H9"></path>
+        </svg>
+        <p>Aucune notification</p>
+        <p class="text-sm text-gray-400 mt-1">Vous êtes à jour !</p>
+      </div>
+
+      <div *ngFor="let notification of notifications" 
+           class="border-b border-gray-100 p-4 hover:bg-gray-50 transition-colors duration-150"
+           [class.bg-blue-50]="!notification.read">
+        
+        <div class="flex items-start space-x-3">
+          <!-- Icône de catégorie -->
+          <div class="flex-shrink-0">
+            <span class="text-lg">{{ getCategoryIcon(notification.category) }}</span>
+          </div>
+          
+          <!-- Contenu de la notification -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <h4 class="text-sm font-medium text-gray-900 truncate">
+                {{ getNotificationIcon(notification.type) }} {{ notification.title }}
+              </h4>
+              <span class="text-xs text-gray-500">{{ formatTimestamp(notification.timestamp) }}</span>
+            </div>
+            
+            <p class="text-sm text-gray-600 mb-2">{{ notification.message }}</p>
+            
+            <!-- Actions -->
+            <div *ngIf="notification.actions && notification.actions.length > 0" 
+                 class="flex flex-wrap gap-2 mb-2">
+              <button *ngFor="let action of notification.actions" 
+                      (click)="executeAction(action, notification)"
+                      [class]="'px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ' + getActionButtonClass(action.style || 'primary')">
+                {{ action.label }}
+              </button>
+            </div>
+            
+            <!-- Indicateur non lu -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span *ngIf="!notification.read" 
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Nouveau
+                </span>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {{ notification.category }}
+                </span>
+              </div>
+              
+              <div class="flex space-x-1">
+                <button *ngIf="!notification.read" 
+                        (click)="markAsRead(notification)"
+                        class="text-blue-600 hover:text-blue-800 text-xs"
+                        title="Marquer comme lu">
+                  ✓
+                </button>
+                <button (click)="deleteNotification(notification)"
+                        class="text-red-600 hover:text-red-800 text-xs"
+                        title="Supprimer">
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer avec actions globales -->
+    <div *ngIf="notifications.length > 0" class="p-3 bg-gray-50 rounded-b-lg border-t">
+      <div class="flex justify-between items-center">
+        <span class="text-xs text-gray-600">{{ notifications.length }} notification(s)</span>
+        <div class="flex space-x-2">
+          <button (click)="markAllAsRead()" 
+                  class="text-xs text-blue-600 hover:text-blue-800"
+                  title="Marquer tout comme lu">
+            Tout marquer comme lu
+          </button>
+          <button (click)="clearAll()" 
+                  class="text-xs text-red-600 hover:text-red-800"
+                  title="Supprimer toutes les notifications">
+            Tout supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

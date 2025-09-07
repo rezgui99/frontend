@@ -60,7 +60,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", userManagementRoutes);
 app.use("/api/job-offers", jobOfferRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));-
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 404 - Route non trouvée
 app.use((req, res, next) => {

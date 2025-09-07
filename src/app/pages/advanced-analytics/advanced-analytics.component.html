@@ -1,135 +1,74 @@
-<div class="p-6">
-  <div class="flex justify-between items-center mb-6">
-    <div>
-      <h2 class="text-3xl font-bold text-primary">📊 Analytics RH Avancées</h2>
-      <p class="text-gray-600 mt-2">Statistiques détaillées et recommandations intelligentes</p>
-    </div>
-    <div class="flex space-x-3">
-      
-    
-    </div>
-  </div>
-
-  <!-- Filtres -->
-  <div class="card mb-6">
-    <h3 class="text-lg font-semibold text-dark mb-4">🔍 Filtres d'Analyse</h3>
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+<div class="min-h-screen bg-gray-50 p-6">
+  <!-- Header avec actions -->
+  <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
       <div>
-        <label class="block text-gray-700 text-sm font-bold mb-2">Date de début</label>
-        <input type="date" [(ngModel)]="filters.date_from" 
-               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-      </div>
-      <div>
-        <label class="block text-gray-700 text-sm font-bold mb-2">Date de fin</label>
-        <input type="date" [(ngModel)]="filters.date_to" 
-               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-      </div>
-      <div>
-        <label class="block text-gray-700 text-sm font-bold mb-2">Département</label>
-        <select [(ngModel)]="filters.department" 
-                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-          <option value="">Tous les départements</option>
-          <option value="Développement">Développement</option>
-          <option value="Support">Support</option>
-          <option value="Commercial">Commercial</option>
-          <option value="Ressources Humaines">Ressources Humaines</option>
-          <option value="Marketing">Marketing</option>
-        </select>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Analytics RH Avancées</h1>
+        <p class="text-gray-600">Tableau de bord intelligent avec analyses prédictives</p>
       </div>
       
-      <div class="flex items-end space-x-2">
-        <button (click)="applyFilters()" class="btn btn-primary flex-1">
-          Appliquer
+      <!-- Actions principales -->
+      <div class="flex flex-wrap gap-3">
+        <button 
+          (click)="refreshData()" 
+          [disabled]="loading"
+          class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Actualiser
         </button>
-        <button (click)="clearFilters()" class="btn btn-secondary flex-1">
-          Effacer
+        
+        <button 
+          (click)="generateAIReport()" 
+          [disabled]="isGeneratingReport || loading"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+          <svg *ngIf="!isGeneratingReport" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <div *ngIf="isGeneratingReport" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          {{ isGeneratingReport ? 'Génération...' : 'Rapport IA' }}
         </button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Navigation par onglets -->
-  <div class="mb-6">
-    <nav class="flex space-x-8" aria-label="Tabs">
-      <button (click)="setActiveTab('overview')" 
-              [class]="activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
-              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
-        📊 Vue d'ensemble
-      </button>
-      <button (click)="setActiveTab('departments')" 
-              [class]="activeTab === 'departments' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
-              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
-        🏢 Départements
-      </button>
-      <button (click)="setActiveTab('skills')" 
-              [class]="activeTab === 'skills' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
-              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
-        🎯 Compétences demandées
-      </button>
-     
-    </nav>
-  </div>
+        <!-- Menu export -->
+        <div class="relative" #exportMenu>
+          <button 
+            (click)="toggleExportMenu()"
+            [disabled]="isExporting || loading"
+            class="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            {{ isExporting ? 'Export...' : 'Exporter' }}
+          </button>
 
-  <!-- Loading -->
-  <div *ngIf="loading" class="text-center text-primary py-8">
-    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-    <p class="mt-2">Chargement des analytics...</p>
-  </div>
-
-  <!-- Error -->
-  <div *ngIf="errorMessage" class="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-md">
-    <div class="flex">
-      <svg class="h-5 w-5 text-yellow-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-      </svg>
-      {{ errorMessage }}
-    </div>
-  </div>
-
-  <!-- Vue d'ensemble -->
-  <div *ngIf="activeTab === 'overview' && !loading && analyticsOverview">
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div class="bg-blue-50 p-6 rounded-lg text-center">
-        <div class="text-3xl font-bold text-blue-600">{{ analyticsOverview.total_employees }}</div>
-        <div class="text-sm text-gray-600">Employés totaux</div>
-      </div>
-      <div class="bg-green-50 p-6 rounded-lg text-center">
-        <div class="text-3xl font-bold text-green-600">{{ analyticsOverview.total_applications }}</div>
-        <div class="text-sm text-gray-600">Candidatures</div>
-      </div>
-      <div class="bg-yellow-50 p-6 rounded-lg text-center">
-        <div class="text-3xl font-bold text-yellow-600">{{ analyticsOverview.overall_success_rate | number:'1.1-1' }}%</div>
-        <div class="text-sm text-gray-600">Taux de succès</div>
-      </div>
-      <div class="bg-purple-50 p-6 rounded-lg text-center">
-        <div class="text-3xl font-bold text-purple-600">{{ analyticsOverview.total_job_descriptions }}</div>
-        <div class="text-sm text-gray-600">Postes disponibles</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Statistiques par département -->
-  <div *ngIf="activeTab === 'departments' && !loading">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="card">
-        <h3 class="text-xl font-semibold text-dark mb-4">📊 Performance par Département</h3>
-        <div class="relative h-80">
-          <canvas #departmentChart></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <h3 class="text-xl font-semibold text-dark mb-4">📋 Détails par Département</h3>
-        <div class="space-y-4">
-          <div *ngFor="let dept of departmentStats" class="border rounded-lg p-4">
-            <div class="flex justify-between items-center mb-2">
-              <h4 class="font-semibold text-gray-900">{{ dept.department }}</h4>
-              <span class="text-lg font-bold text-green-600">{{ dept.success_rate | number:'1.1-1' }}%</span>
-            </div>
-            <div class="grid grid-cols-2 gap-4 text-sm text-gray-600">
-              <div>Candidatures: {{ dept.total_applications }}</div>
-              <div>Succès: {{ dept.successful_applications }}</div>
-              <div>Temps moyen: {{ dept.average_time_to_hire }}j</div>
-              <div>Taux: {{ dept.success_rate | number:'1.1-1' }}%</div>
+          <!-- Dropdown menu export -->
+          <div *ngIf="showExportMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 border">
+            <div class="py-2">
+              <button (click)="exportData('csv')" class="w-full text-left px-4 py-2 hover:bg-gray-50">
+                <span class="flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5z"></path>
+                  </svg>
+                  Export CSV
+                </span>
+              </button>
+              <button (click)="exportData('excel')" class="w-full text-left px-4 py-2 hover:bg-gray-50">
+                <span class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5z"></path>
+                  </svg>
+                  Export Excel
+                </span>
+              </button>
+              <button (click)="exportData('json')" class="w-full text-left px-4 py-2 hover:bg-gray-50">
+                <span class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5z"></path>
+                  </svg>
+                  Export JSON
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -137,33 +76,352 @@
     </div>
   </div>
 
+  <!-- Panneau de filtres avancés -->
+  <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+      </svg>
+      Filtres d'Analyse
+    </h3>
 
-  
-  <!-- Analyse des compétences demandées -->
-  <div *ngIf="activeTab === 'skills' && !loading">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="card">
-        <h3 class="text-xl font-semibold text-dark mb-4">🎯 Top Compétences Demandées</h3>
-        <div class="relative h-80">
-          <canvas #skillsChart></canvas>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Date de début</label>
+        <input 
+          type="date" 
+          [(ngModel)]="filters.date_from" 
+          (ngModelChange)="onFiltersChange()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Date de fin</label>
+        <input 
+          type="date" 
+          [(ngModel)]="filters.date_to" 
+          (ngModelChange)="onFiltersChange()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Département</label>
+        <select 
+          [(ngModel)]="filters.department" 
+          (ngModelChange)="onFiltersChange()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">Tous les départements</option>
+          <option value="Développement">Développement</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Commercial">Commercial</option>
+          <option value="RH">Ressources Humaines</option>
+          <option value="Finance">Finance</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Type de contrat</label>
+        <select 
+          [(ngModel)]="filters.contract_type" 
+          (ngModelChange)="onFiltersChange()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">Tous les contrats</option>
+          <option value="CDI">CDI</option>
+          <option value="CDD">CDD</option>
+          <option value="Stage">Stage</option>
+          <option value="Freelance">Freelance</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
+        <input 
+          type="text" 
+          [(ngModel)]="filters.search" 
+          (ngModelChange)="onFiltersChange()"
+          placeholder="Rechercher..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+      </div>
+
+      <div class="flex items-end">
+        <button 
+          (click)="clearFilters()" 
+          class="w-full px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+          Réinitialiser
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+        <span class="text-red-700 font-medium">{{ error }}</span>
+      </div>
+      <button (click)="clearError()" class="text-red-500 hover:text-red-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading skeleton -->
+  <div *ngIf="loading" class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div *ngFor="let item of [1,2,3,4]" class="bg-white rounded-xl p-6 animate-pulse">
+        <div class="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+        <div class="h-8 bg-gray-200 rounded w-1/2"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl p-6 animate-pulse">
+      <div class="h-64 bg-gray-200 rounded"></div>
+    </div>
+  </div>
+
+  <!-- Contenu principal -->
+  <div *ngIf="!loading && dashboard">
+    <!-- Cartes métriques principales -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div *ngFor="let card of metricCards" 
+           class="bg-white rounded-xl shadow-sm p-6 border-l-4 hover:shadow-md transition-all duration-200"
+           [style.border-left-color]="card.color">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">{{ card.title }}</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ card.value }}</p>
+            <div *ngIf="card.change" class="flex items-center mt-2">
+              <svg *ngIf="card.changeType === 'increase'" class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"></path>
+              </svg>
+              <svg *ngIf="card.changeType === 'decrease'" class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 7l-9.2 9.2M7 7h10v10"></path>
+              </svg>
+              <span [class]="card.changeType === 'increase' ? 'text-green-600' : 'text-red-600'" 
+                    class="text-sm font-medium ml-1">
+                {{ card.change }}%
+              </span>
+            </div>
+          </div>
+          <div class="text-3xl opacity-50">{{ card.icon }}</div>
         </div>
       </div>
-      <div class="card">
-        <h3 class="text-xl font-semibold text-dark mb-4">📈 Analyse Détaillée des Compétences</h3>
-        <div class="space-y-3">
-          <div *ngFor="let skill of skillsDemand.slice(0, 8)" class="border rounded-lg p-3">
-            <div class="flex justify-between items-center mb-2">
-              <h5 class="font-medium text-gray-900">{{ skill.skill_name }}</h5>
-              <span class="text-sm font-bold text-blue-600">{{ skill.demand_count }} demandes</span>
+    </div>
+
+    <!-- Navigation par onglets -->
+    <div class="bg-white rounded-xl shadow-sm mb-6">
+      <div class="bg-white rounded-xl shadow-sm mb-6">
+  <nav class="flex border-b border-gray-200" aria-label="Tabs">
+    <button 
+      *ngFor="let tab of tabs"
+      (click)="setActiveTab(tab.key)" 
+      [ngClass]="activeTab === tab.key 
+        ? 'border-blue-500 text-blue-600 bg-blue-50' 
+        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+      class="flex-1 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-all duration-200">
+      <span class="flex items-center justify-center gap-2">
+        <span>{{ tab.icon }}</span>
+        <span class="hidden sm:inline">{{ tab.label }}</span>
+      </span>
+    </button>
+  </nav>
+</div>
+
+      <!-- Contenu des onglets -->
+      <div class="p-6">
+        <!-- Vue d'ensemble -->
+        <div *ngIf="activeTab === 'overview'" class="space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Graphique métriques globales -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Répartition Globale</h3>
+              <div class="relative h-80">
+                <canvas #metricsChart></canvas>
+              </div>
             </div>
-            <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
-              <div>Taux de succès: {{ skill.success_rate_with_skill | number:'1.1-1' }}%</div>
-              <div>Niveau moyen requis: {{ skill.average_level_required | number:'1.1-1' }}</div>
+
+            <!-- Insights et recommandations -->
+            <div class="space-y-4">
+              <div class="bg-blue-50 rounded-lg p-4">
+                <h4 class="text-md font-semibold text-blue-900 mb-3">Insights Clés</h4>
+                <ul class="space-y-2">
+                  <li *ngFor="let insight of dashboard.departmentAnalysis.insights || []" 
+                      class="text-sm text-blue-800 flex items-start gap-2">
+                    <svg class="w-4 h-4 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    {{ insight }}
+                  </li>
+                </ul>
+              </div>
+
+              <div class="bg-green-50 rounded-lg p-4">
+                <h4 class="text-md font-semibold text-green-900 mb-3">Recommandations</h4>
+                <div class="space-y-3">
+                  <div *ngFor="let rec of dashboard.recommendations.slice(0, 3) || []" 
+                       class="border-l-3 border-green-400 pl-3">
+                    <h5 class="font-medium text-green-900">{{ rec }}</h5>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="mt-2">
-              <div class="w-full bg-gray-200 rounded-full h-1">
-                <div class="bg-blue-600 h-1 rounded-full"
-                     [style.width.%]="skill.success_rate_with_skill">
+          </div>
+        </div>
+
+        <!-- Analyse départements -->
+        <div *ngIf="activeTab === 'departments'" class="space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <!-- Graphique départements -->
+            <div class="xl:col-span-2 bg-gray-50 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance par Département</h3>
+              <div class="relative h-96">
+                <canvas #departmentChart></canvas>
+              </div>
+            </div>
+
+            <!-- Tableau détaillé -->
+            <div class="bg-white border rounded-lg">
+              <div class="px-4 py-3 border-b bg-gray-50">
+                <h4 class="font-semibold text-gray-900">Détails Départements</h4>
+              </div>
+              <div class="max-h-96 overflow-y-auto">
+                <div *ngFor="let dept of departmentStats" 
+                     class="p-4 border-b last:border-b-0 hover:bg-gray-50">
+                  <div class="flex justify-between items-center mb-2">
+                    <h5 class="font-medium text-gray-900">{{ dept.department }}</h5>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium"
+                          [class]="dept.success_rate >= 70 ? 'bg-green-100 text-green-800' : 
+                                   dept.success_rate >= 50 ? 'bg-yellow-100 text-yellow-800' : 
+                                   'bg-red-100 text-red-800'">
+                      {{ dept.success_rate }}%
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div>Employés: {{ dept.employee_count }}</div>
+                    <div>Ancienneté: {{ dept.avg_tenure | number:'1.1-1' }}ans</div>
+                    <div>Compétences: {{ dept.unique_skills }}</div>
+                    <div>Rétention: {{ dept.retention_rate }}%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyse compétences -->
+        <div *ngIf="activeTab === 'skills'" class="space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <!-- Graphique compétences -->
+            <div class="xl:col-span-2 bg-gray-50 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Compétences Demandées</h3>
+              <div class="relative h-96">
+                <canvas #skillsChart></canvas>
+              </div>
+            </div>
+
+            <!-- Liste détaillée compétences -->
+            <div class="space-y-3">
+              <h4 class="font-semibold text-gray-900">Analyse Détaillée</h4>
+              <div class="space-y-3 max-h-96 overflow-y-auto">
+                <div *ngFor="let skill of skillsDemand.slice(0, 10)" 
+                     class="bg-white border rounded-lg p-3 hover:shadow-sm transition-shadow">
+                  <div class="flex justify-between items-start mb-2">
+                    <h5 class="font-medium text-gray-900 text-sm">{{ skill.skill_name }}</h5>
+                    <span class="text-xs text-gray-500">{{ skill.skill_type }}</span>
+                  </div>
+                  <div class="space-y-1">
+                    <div class="flex justify-between text-xs">
+                      <span class="text-gray-600">Demande:</span>
+                      <span class="font-medium">{{ skill.demand_count }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                      <span class="text-gray-600">Score marché:</span>
+                      <span class="font-medium">{{ skill.market_value_score }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                      <span class="text-gray-600">Potentiel:</span>
+                      <span class="font-medium">{{ skill.growth_potential }}%</span>
+                    </div>
+                    <!-- Barre de progression -->
+                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                      <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                           [style.width.%]="skill.growth_potential">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyse contrats -->
+        <div *ngIf="activeTab === 'contracts'" class="space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Graphique radar -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Comparaison Types de Contrats</h3>
+              <div class="relative h-80">
+                <canvas #contractChart></canvas>
+              </div>
+            </div>
+
+            <!-- Tableau contrats -->
+            <div class="bg-white border rounded-lg">
+              <div class="px-4 py-3 border-b bg-gray-50">
+                <h4 class="font-semibold text-gray-900">Statistiques Détaillées</h4>
+              </div>
+              <div class="p-4 space-y-4">
+                <div *ngFor="let contract of contractStats" 
+                     class="border rounded-lg p-3 hover:bg-gray-50">
+                  <div class="flex justify-between items-center mb-2">
+                    <h5 class="font-medium text-gray-900">{{ contract.contract_type }}</h5>
+                    <span class="text-sm font-medium text-green-600">
+                      {{ contract.success_rate }}% succès
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                    <div>Candidatures: {{ contract.total_applications }}</div>
+                    <div>Réussies: {{ contract.successful_applications }}</div>
+                    <div>Salaire min: {{ contract.average_salary_min | currency:'EUR':'symbol':'1.0-0' }}</div>
+                    <div>Salaire max: {{ contract.average_salary_max | currency:'EUR':'symbol':'1.0-0' }}</div>
+                    <div>Temps moyen: {{ contract.average_time_to_hire }}j</div>
+                    <div>Satisfaction: {{ contract.satisfaction_rate }}%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyse tendances -->
+        <div *ngIf="activeTab === 'trends'" class="space-y-6">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Évolution Temporelle</h3>
+            <div class="relative h-96">
+              <canvas #trendsChart></canvas>
+            </div>
+          </div>
+
+          <!-- Prédictions -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div *ngFor="let prediction of (dashboard.trends.predictions || []).slice(0, 3)" 
+                 class="bg-white border rounded-lg p-4">
+              <h4 class="font-medium text-gray-900 mb-2">{{ prediction.metric }}</h4>
+              <div class="text-2xl font-bold text-blue-600 mb-1">
+                {{ prediction.predicted_value | number:'1.0-0' }}
+              </div>
+              <div class="text-sm text-gray-600">{{ prediction.timeframe }}</div>
+              <div class="mt-2">
+                <div class="text-xs text-gray-500 mb-1">Confiance</div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="bg-blue-600 h-2 rounded-full"
+                       [style.width.%]="prediction.confidence || 75">
+                  </div>
                 </div>
               </div>
             </div>

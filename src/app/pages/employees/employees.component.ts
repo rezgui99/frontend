@@ -138,6 +138,12 @@ export class EmployeesComponent implements OnInit {
       fileInput.value = '';
     }
   }
+
+  onProfileImageError(event: any): void {
+    console.warn('Erreur de chargement d\'image de profil dans le formulaire');
+    event.target.style.display = 'none';
+  }
+
   loadEmployees(): void {
     this.loading = true;
     this.errorMessage = null;
@@ -597,9 +603,15 @@ onEmployeeSubmit(): void {
 // Gestion des erreurs d'image
 onImageError(event: any, employee: Employee): void {
   console.warn(`Erreur de chargement d'image pour ${employee.name}:`, employee.profile_picture);
-  // Masquer l'image en cas d'erreur
   event.target.style.display = 'none';
-  // Optionnel: vous pouvez aussi mettre à jour l'objet employee pour marquer l'image comme défaillante
+  // Forcer l'affichage des initiales
+  const parentElement = event.target.parentElement;
+  if (parentElement) {
+    const spanElement = parentElement.querySelector('span');
+    if (spanElement) {
+      spanElement.style.display = 'block';
+    }
+  }
 }
 
 // Méthode pour vérifier si l'employé a une photo valide
@@ -607,10 +619,11 @@ hasProfileImage(employee: Employee): boolean {
   return !!(employee.profile_picture && 
            employee.profile_picture.trim() !== '' && 
            !employee.profile_picture.includes('undefined') &&
-           !employee.profile_picture.includes('null'));
+           !employee.profile_picture.includes('null') &&
+           employee.profile_picture !== 'null');
 }
 
-// Méthode corrigée pour obtenir l'image de profil
+// Méthode pour obtenir l'image de profil
 getProfileImage(employee: Employee): string {
   if (!employee.profile_picture) return '';
   
@@ -619,7 +632,12 @@ getProfileImage(employee: Employee): string {
     return employee.profile_picture;
   }
   
-  // Si c'est un chemin relatif, construire l'URL complète
+  // Si c'est une image base64
+  if (employee.profile_picture.startsWith('data:image')) {
+    return employee.profile_picture;
+  }
+  
+  // Construire l'URL complète
   const baseUrl = 'http://localhost:3000';
   const imagePath = employee.profile_picture.startsWith('/') ? 
                    employee.profile_picture : 
