@@ -27,6 +27,7 @@ const authRoutes = require("./src/routes/auth");
 const userManagementRoutes = require("./src/routes/userManagement");
 const jobOfferRoutes = require("./src/routes/joboffer");
  const analyticsRoutes = require("./src/routes/analytics");
+ const gpecAlertsRoutes = require("./src/routes/gpec-alerts");
 
 
 
@@ -60,7 +61,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", userManagementRoutes);
 app.use("/api/job-offers", jobOfferRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/api/gpec-alerts", gpecAlertsRoutes);
+app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
 
 // 404 - Route non trouvée
 app.use((req, res, next) => {

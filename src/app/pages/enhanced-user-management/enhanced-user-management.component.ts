@@ -14,9 +14,6 @@ import { TooltipDirective } from '../../components/tooltip/tooltip.directive';
   styleUrls: ['./enhanced-user-management.component.css']
 })
 export class EnhancedUserManagementComponent implements OnInit {
-getEndIndex() {
-throw new Error('Method not implemented.');
-}
   users: UserManagement[] = [];
   roles: Role[] = [];
   
@@ -522,6 +519,10 @@ Math: any;
 
   get currentUserId(): number | null {
     return this.authService.currentUser?.id || null;
+  }
+
+  getEndIndex(): number {
+    return Math.min(this.currentPage * this.pageSize, this.totalUsers);
   }
 
   onRoleCheckboxChange(event: any, roleId: number): void {

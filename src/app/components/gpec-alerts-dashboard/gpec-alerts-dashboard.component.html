@@ -1,0 +1,684 @@
+<div class="p-6">
+  <!-- Header avec actions principales -->
+  <div class="mb-8">
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h2 class="text-3xl font-bold text-primary">🚨 Alertes GPEC Proactives</h2>
+        <p class="text-gray-600 mt-2">Système d'alerte intelligent pour anticiper les risques RH</p>
+      </div>
+      <div class="flex space-x-3">
+        <button (click)="simulateAlerts()" 
+                class="btn btn-secondary">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          Simuler alertes
+        </button>
+        <button (click)="runAnalysis()" 
+                [disabled]="loading"
+                class="btn btn-primary">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
+          {{ loading ? 'Analyse...' : 'Lancer analyse' }}
+        </button>
+        <button (click)="generateReport()" 
+                class="btn btn-secondary">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          Rapport PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Métriques principales -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+      <div class="bg-gradient-to-r from-red-500 to-red-600 p-4 rounded-xl text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-red-100 text-sm">Alertes Critiques</p>
+            <p class="text-2xl font-bold">{{ alertStats.critical }}</p>
+          </div>
+          <div class="text-3xl">🚨</div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-orange-500 to-orange-600 p-4 rounded-xl text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-orange-100 text-sm">Priorité Haute</p>
+            <p class="text-2xl font-bold">{{ alertStats.high }}</p>
+          </div>
+          <div class="text-3xl">⚠️</div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-xl text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-blue-100 text-sm">Total Alertes</p>
+            <p class="text-2xl font-bold">{{ alertStats.total }}</p>
+          </div>
+          <div class="text-3xl">📊</div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-xl text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-green-100 text-sm">Résolues Aujourd'hui</p>
+            <p class="text-2xl font-bold">{{ alertStats.resolved_today }}</p>
+          </div>
+          <div class="text-3xl">✅</div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-xl text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-purple-100 text-sm">Temps Résolution</p>
+            <p class="text-2xl font-bold">{{ alertStats.avg_resolution_time }}j</p>
+          </div>
+          <div class="text-3xl">⏱️</div>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 p-4 rounded-xl text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-indigo-100 text-sm">En Cours</p>
+            <p class="text-2xl font-bold">{{ alerts.filter(a => a.status === 'in_progress').length }}</p>
+          </div>
+          <div class="text-3xl">🔄</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation par onglets -->
+  <div class="mb-6">
+    <nav class="flex space-x-8" aria-label="Tabs">
+      <button (click)="setActiveTab('overview')" 
+              [class]="selectedTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+        📊 Vue d'ensemble
+      </button>
+      <button (click)="setActiveTab('alerts')" 
+              [class]="selectedTab === 'alerts' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+        🚨 Alertes Actives ({{ alerts.filter(a => a.status === 'active').length }})
+      </button>
+      <button (click)="setActiveTab('predictions')" 
+              [class]="selectedTab === 'predictions' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+        🔮 Prédictions
+      </button>
+      <button (click)="setActiveTab('actions')" 
+              [class]="selectedTab === 'actions' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+        📋 Plans d'Action
+      </button>
+      <button (click)="setActiveTab('config')" 
+              [class]="selectedTab === 'config' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
+              class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+        ⚙️ Configuration
+      </button>
+    </nav>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="text-center py-12">
+    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    <p class="mt-4 text-gray-600">Analyse des risques en cours...</p>
+  </div>
+
+  <!-- Vue d'ensemble -->
+  <div *ngIf="selectedTab === 'overview' && !loading">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Alertes critiques -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">🚨 Alertes Critiques</h3>
+        <div class="space-y-3">
+          <div *ngFor="let alert of alerts.filter(a => a.severity === 'critical' && a.status === 'active')" 
+               class="p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg">
+            <div class="flex justify-between items-start">
+              <div class="flex-1">
+                <h4 class="font-semibold text-red-800">{{ alert.title }}</h4>
+                <p class="text-red-700 text-sm mt-1">{{ alert.description }}</p>
+                <p class="text-red-600 text-xs mt-2">{{ getTimeAgo(alert.createdAt) }}</p>
+              </div>
+              <div class="flex space-x-2">
+                <button (click)="acknowledgeAlert(alert)" 
+                        class="text-red-600 hover:text-red-800 text-sm">
+                  ✓ Prendre en charge
+                </button>
+                <button (click)="showAlertDetail(alert)" 
+                        class="text-red-600 hover:text-red-800 text-sm">
+                  👁️ Détails
+                </button>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="alerts.filter(a => a.severity === 'critical' && a.status === 'active').length === 0" 
+               class="text-center py-6 text-gray-500">
+            <div class="text-4xl mb-2">🎉</div>
+            <p>Aucune alerte critique active</p>
+            <p class="text-sm text-gray-400">Excellente gestion des risques !</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tendances et prédictions -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">📈 Tendances Détectées</h3>
+        <div class="space-y-4">
+          <div *ngFor="let trend of dashboard?.trending_risks || []" 
+               class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-semibold text-yellow-800">{{ trend.description }}</h4>
+              <span [class]="'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ' + 
+                            (trend.trend === 'increasing' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800')">
+                {{ trend.trend === 'increasing' ? '📈 +' : '📉 -' }}{{ trend.change_percentage }}%
+              </span>
+            </div>
+            <p class="text-yellow-700 text-sm">{{ trend.affected_count }} entité(s) affectée(s)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Échéances importantes -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">⏰ Échéances Importantes</h3>
+        <div class="space-y-3">
+          <div *ngFor="let deadline of dashboard?.upcoming_deadlines || []" 
+               class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div>
+              <h4 class="font-semibold text-blue-800">{{ deadline.title }}</h4>
+              <p class="text-blue-600 text-sm">{{ deadline.assigned_to }}</p>
+            </div>
+            <div class="text-right">
+              <span [class]="'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ' + 
+                            (deadline.days_remaining <= 3 ? 'bg-red-100 text-red-800' : 
+                             deadline.days_remaining <= 7 ? 'bg-yellow-100 text-yellow-800' : 
+                             'bg-green-100 text-green-800')">
+                {{ deadline.days_remaining }} jour(s)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success stories -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">🏆 Succès Récents</h3>
+        <div class="space-y-3">
+          <div *ngFor="let story of dashboard?.success_stories || []" 
+               class="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h4 class="font-semibold text-green-800">{{ story.title }}</h4>
+            <p class="text-green-700 text-sm mt-1">{{ story.description }}</p>
+            <div class="flex justify-between items-center mt-2">
+              <span class="text-green-600 text-xs">{{ story.time_to_resolution }} jours</span>
+              <span class="text-green-600 text-xs font-semibold">{{ story.cost_saved | number }}€ économisés</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglet Alertes -->
+  <div *ngIf="selectedTab === 'alerts' && !loading">
+    <!-- Filtres -->
+    <div class="card mb-6">
+      <h3 class="text-lg font-semibold text-dark mb-4">🔍 Filtres et Recherche</h3>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Recherche</label>
+          <input type="text" [(ngModel)]="searchQuery" 
+                 placeholder="Titre, description..." 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Sévérité</label>
+          <select [(ngModel)]="selectedSeverity" 
+                  class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">Toutes</option>
+            <option value="critical">🚨 Critique</option>
+            <option value="high">⚠️ Élevée</option>
+            <option value="medium">⚡ Moyenne</option>
+            <option value="low">ℹ️ Faible</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Catégorie</label>
+          <select [(ngModel)]="selectedCategory" 
+                  class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">Toutes</option>
+            <option value="skills">🎯 Compétences</option>
+            <option value="retention">👥 Rétention</option>
+            <option value="performance">📊 Performance</option>
+            <option value="compliance">✅ Conformité</option>
+            <option value="strategic">🎯 Stratégique</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Statut</label>
+          <select [(ngModel)]="selectedStatus" 
+                  class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">Tous</option>
+            <option value="active">🔴 Active</option>
+            <option value="acknowledged">🟡 Prise en charge</option>
+            <option value="in_progress">🔵 En cours</option>
+            <option value="resolved">🟢 Résolue</option>
+            <option value="dismissed">⚫ Rejetée</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button (click)="clearFilters()" class="btn btn-secondary w-full">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            Effacer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Liste des alertes -->
+    <div class="card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold text-dark">
+          📋 Alertes Actives ({{ filteredAlerts.length }})
+        </h3>
+        <button (click)="exportAlerts()" class="btn btn-secondary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          Export CSV
+        </button>
+      </div>
+
+      <div *ngIf="filteredAlerts.length === 0" class="text-center py-8 text-gray-500">
+        <div class="text-4xl mb-4">🎯</div>
+        <p>Aucune alerte trouvée</p>
+        <p class="text-sm text-gray-400 mt-1">Modifiez vos filtres ou lancez une nouvelle analyse</p>
+      </div>
+
+      <div *ngIf="filteredAlerts.length > 0" class="space-y-4">
+        <div *ngFor="let alert of filteredAlerts" 
+             class="border rounded-lg p-6 hover:shadow-md transition-shadow duration-200"
+             [class]="alert.severity === 'critical' ? 'border-red-300 bg-red-50' : 
+                      alert.severity === 'high' ? 'border-orange-300 bg-orange-50' :
+                      alert.severity === 'medium' ? 'border-yellow-300 bg-yellow-50' :
+                      'border-blue-300 bg-blue-50'">
+          
+          <div class="flex justify-between items-start mb-4">
+            <div class="flex items-center space-x-3">
+              <div class="text-2xl">{{ getSeverityIcon(alert.severity) }}</div>
+              <div>
+                <h4 class="text-lg font-semibold text-gray-900">{{ alert.title }}</h4>
+                <div class="flex items-center space-x-2 mt-1">
+                  <span [class]="'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ' + getSeverityClass(alert.severity)">
+                    {{ alert.severity.toUpperCase() }}
+                  </span>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    {{ getCategoryIcon(alert.category) }} {{ alert.category }}
+                  </span>
+                  <span [class]="'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ' + getStatusClass(alert.status)">
+                    {{ alert.status }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right text-sm text-gray-500">
+              <p>{{ getTimeAgo(alert.createdAt) }}</p>
+              <p *ngIf="alert.metrics?.time_to_critical" class="text-red-600 font-semibold">
+                ⏰ {{ alert.metrics.time_to_critical }} jours restants
+              </p>
+            </div>
+          </div>
+
+          <p class="text-gray-700 mb-4">{{ alert.description }}</p>
+          
+          <div class="mb-4">
+            <p class="text-sm font-semibold text-gray-800 mb-2">💥 Impact:</p>
+            <p class="text-sm text-gray-600">{{ alert.impact }}</p>
+          </div>
+
+          <div class="mb-4">
+            <p class="text-sm font-semibold text-gray-800 mb-2">💡 Recommandations:</p>
+            <ul class="text-sm text-gray-600 space-y-1">
+              <li *ngFor="let rec of alert.recommendations.slice(0, 3)" class="flex items-start">
+                <span class="text-blue-500 mr-2">•</span>
+                {{ rec }}
+              </li>
+              <li *ngIf="alert.recommendations.length > 3" class="text-gray-500 text-xs">
+                ... et {{ alert.recommendations.length - 3 }} autres recommandations
+              </li>
+            </ul>
+          </div>
+
+          <!-- Métriques -->
+          <div *ngIf="alert.metrics" class="mb-4 p-3 bg-white rounded-lg border">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span class="text-gray-500">Valeur actuelle:</span>
+                <p class="font-semibold">{{ alert.metrics.current_value }}</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Seuil:</span>
+                <p class="font-semibold">{{ alert.metrics.threshold_value }}</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Tendance:</span>
+                <p class="font-semibold" [class]="alert.metrics.trend === 'increasing' ? 'text-red-600' : 
+                                                  alert.metrics.trend === 'decreasing' ? 'text-green-600' : 'text-gray-600'">
+                  {{ alert.metrics.trend === 'increasing' ? '📈 Hausse' : 
+                     alert.metrics.trend === 'decreasing' ? '📉 Baisse' : '➡️ Stable' }}
+                </p>
+              </div>
+              <div>
+                <span class="text-gray-500">Confiance:</span>
+                <p class="font-semibold">{{ alert.metrics.confidence_level }}%</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex justify-end space-x-2 pt-4 border-t">
+            <button *ngIf="alert.status === 'active'" 
+                    (click)="acknowledgeAlert(alert)" 
+                    class="btn btn-secondary text-sm">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Prendre en charge
+            </button>
+            <button (click)="createActionPlan(alert)" 
+                    class="btn btn-primary text-sm">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+              Plan d'action
+            </button>
+            <button (click)="showAlertDetail(alert)" 
+                    class="btn btn-secondary text-sm">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              Détails
+            </button>
+            <button *ngIf="alert.status === 'active'" 
+                    (click)="dismissAlert(alert)" 
+                    class="btn bg-gray-500 text-white hover:bg-gray-600 text-sm">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              Rejeter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglet Prédictions -->
+  <div *ngIf="selectedTab === 'predictions' && !loading">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Risques de départ -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">🏃‍♂️ Risques de Départ</h3>
+        <div class="space-y-3">
+          <div *ngFor="let risk of departureRisks.slice(0, 5)" 
+               class="p-4 border rounded-lg"
+               [class]="risk.risk_score > 80 ? 'border-red-300 bg-red-50' : 
+                        risk.risk_score > 60 ? 'border-orange-300 bg-orange-50' : 
+                        'border-yellow-300 bg-yellow-50'">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="font-semibold">{{ risk.employee_name }}</h4>
+              <span class="text-lg font-bold" 
+                    [class]="risk.risk_score > 80 ? 'text-red-600' : 
+                             risk.risk_score > 60 ? 'text-orange-600' : 'text-yellow-600'">
+                {{ risk.risk_score }}%
+              </span>
+            </div>
+            <p class="text-sm text-gray-600">{{ risk.position }} - {{ risk.department }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+              Confiance: {{ risk.confidence_level }}% | 
+              Départ prévu: {{ formatDate(risk.predicted_departure_date) }}
+            </p>
+          </div>
+          <div *ngIf="departureRisks.length === 0" class="text-center py-6 text-gray-500">
+            <div class="text-4xl mb-2">😊</div>
+            <p>Aucun risque de départ détecté</p>
+            <p class="text-sm text-gray-400">Excellente rétention des talents !</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gaps de compétences -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">🎯 Gaps de Compétences</h3>
+        <div class="space-y-3">
+          <div *ngFor="let gap of skillGaps.slice(0, 5)" 
+               class="p-4 border rounded-lg"
+               [class]="gap.gap_percentage > 60 ? 'border-red-300 bg-red-50' : 
+                        gap.gap_percentage > 40 ? 'border-orange-300 bg-orange-50' : 
+                        'border-yellow-300 bg-yellow-50'">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="font-semibold">{{ gap.skill_name }}</h4>
+              <span class="text-lg font-bold" 
+                    [class]="gap.gap_percentage > 60 ? 'text-red-600' : 
+                             gap.gap_percentage > 40 ? 'text-orange-600' : 'text-yellow-600'">
+                {{ gap.gap_percentage }}%
+              </span>
+            </div>
+            <div class="text-sm text-gray-600">
+              <p>Besoin: {{ gap.required_demand }} | Disponible: {{ gap.current_supply }}</p>
+              <p *ngIf="gap.department">Département: {{ gap.department }}</p>
+            </div>
+            <div class="mt-2">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                    [class]="gap.criticality_score > 80 ? 'bg-red-100 text-red-800' : 
+                             gap.criticality_score > 60 ? 'bg-orange-100 text-orange-800' : 
+                             'bg-yellow-100 text-yellow-800'">
+                Criticité: {{ gap.criticality_score }}/100
+              </span>
+            </div>
+          </div>
+          <div *ngIf="skillGaps.length === 0" class="text-center py-6 text-gray-500">
+            <div class="text-4xl mb-2">🎯</div>
+            <p>Aucun gap critique détecté</p>
+            <p class="text-sm text-gray-400">Compétences bien alignées !</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglet Plans d'Action -->
+  <div *ngIf="selectedTab === 'actions' && !loading">
+    <div class="card">
+      <h3 class="text-xl font-semibold text-dark mb-4">📋 Plans d'Action</h3>
+      <div *ngIf="actionPlans.length === 0" class="text-center py-8 text-gray-500">
+        <div class="text-4xl mb-4">📋</div>
+        <p>Aucun plan d'action en cours</p>
+        <p class="text-sm text-gray-400 mt-1">Créez des plans d'action depuis les alertes</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglet Configuration -->
+  <div *ngIf="selectedTab === 'config' && !loading">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Configuration des seuils -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">⚙️ Configuration des Seuils</h3>
+        <div class="space-y-4">
+          <div>
+            <h4 class="font-semibold text-gray-800 mb-2">🎯 Compétences</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span>Seuil pénurie critique:</span>
+                <span class="font-semibold">30%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Obsolescence (mois):</span>
+                <span class="font-semibold">24</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Ratio demande/offre:</span>
+                <span class="font-semibold">3.0</span>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 class="font-semibold text-gray-800 mb-2">👥 Rétention</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span>Seuil risque départ:</span>
+                <span class="font-semibold">70%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Ancienneté à risque:</span>
+                <span class="font-semibold">6 mois</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <button (click)="updateThresholds()" class="btn btn-primary mt-4">
+          Modifier les seuils
+        </button>
+      </div>
+
+      <!-- Notifications -->
+      <div class="card">
+        <h3 class="text-xl font-semibold text-dark mb-4">🔔 Notifications</h3>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <span>Notifications en temps réel</span>
+            <input type="checkbox" checked class="h-4 w-4 text-primary">
+          </div>
+          <div class="flex items-center justify-between">
+            <span>Emails d'alerte</span>
+            <input type="checkbox" checked class="h-4 w-4 text-primary">
+          </div>
+          <div class="flex items-center justify-between">
+            <span>Escalade automatique</span>
+            <input type="checkbox" class="h-4 w-4 text-primary">
+          </div>
+        </div>
+        
+        <button (click)="configureNotifications()" class="btn btn-primary mt-4">
+          Configurer notifications
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal détails alerte -->
+<div *ngIf="showAlertDetails && selectedAlert" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+    <div class="mt-3">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-medium text-gray-900">
+          {{ getSeverityIcon(selectedAlert.severity) }} {{ selectedAlert.title }}
+        </h3>
+        <button (click)="closeAlertDetails()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <h4 class="font-semibold text-gray-800 mb-3">📋 Informations Générales</h4>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span>Type:</span>
+              <span class="font-semibold">{{ selectedAlert.type }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Sévérité:</span>
+              <span [class]="'font-semibold ' + (selectedAlert.severity === 'critical' ? 'text-red-600' : 
+                                                  selectedAlert.severity === 'high' ? 'text-orange-600' : 
+                                                  'text-yellow-600')">
+                {{ selectedAlert.severity.toUpperCase() }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span>Statut:</span>
+              <span class="font-semibold">{{ selectedAlert.status }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Créée le:</span>
+              <span class="font-semibold">{{ formatDate(selectedAlert.createdAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="font-semibold text-gray-800 mb-3">📊 Métriques</h4>
+          <div *ngIf="selectedAlert.metrics" class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span>Valeur actuelle:</span>
+              <span class="font-semibold">{{ selectedAlert.metrics.current_value }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Seuil d'alerte:</span>
+              <span class="font-semibold">{{ selectedAlert.metrics.threshold_value }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Tendance:</span>
+              <span class="font-semibold">{{ selectedAlert.metrics.trend }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Niveau de confiance:</span>
+              <span class="font-semibold">{{ selectedAlert.metrics.confidence_level }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h4 class="font-semibold text-gray-800 mb-3">📝 Description Complète</h4>
+        <p class="text-gray-700">{{ selectedAlert.description }}</p>
+      </div>
+
+      <div class="mt-6">
+        <h4 class="font-semibold text-gray-800 mb-3">💥 Impact</h4>
+        <p class="text-gray-700">{{ selectedAlert.impact }}</p>
+      </div>
+
+      <div class="mt-6">
+        <h4 class="font-semibold text-gray-800 mb-3">💡 Recommandations</h4>
+        <ul class="space-y-2">
+          <li *ngFor="let rec of selectedAlert.recommendations" class="flex items-start">
+            <span class="text-blue-500 mr-2 mt-1">•</span>
+            <span class="text-gray-700">{{ rec }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="flex justify-end space-x-3 mt-8 pt-4 border-t">
+        <button (click)="closeAlertDetails()" class="btn btn-secondary">
+          Fermer
+        </button>
+        <button *ngIf="selectedAlert.status === 'active'" 
+                (click)="acknowledgeAlert(selectedAlert)" 
+                class="btn btn-primary">
+          Prendre en charge
+        </button>
+        <button (click)="createActionPlan(selectedAlert)" 
+                class="btn btn-primary">
+          Créer plan d'action
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

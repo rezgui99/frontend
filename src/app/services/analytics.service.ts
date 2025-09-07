@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable, BehaviorSubject, throwError } from 'rxjs';
-import { map, catchError, retry, shareReplay, tap } from 'rxjs/operators';
+import { map, catchError, retry, shareReplay, tap, timeout } from 'rxjs/operators';
 import {
   AnalyticsOverview,
   AdvancedDashboard,
@@ -38,7 +38,7 @@ export class AnalyticsService {
   
   // Cache pour les données
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
-  private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes
+  private readonly defaultTTL = 2 * 60 * 1000; // 2 minutes pour des données plus fraîches
 
   constructor(private http: HttpClient) {
     this.initializeErrorHandling();
@@ -63,7 +63,11 @@ export class AnalyticsService {
     
     return this.getCachedOrFetch(cacheKey, () => {
       let params = this.buildHttpParams(filters);
-      return this.http.get<AnalyticsOverview>(`${this.apiUrl}/overview`, { params });
+      return this.http.get<AnalyticsOverview>(`${this.apiUrl}/overview`, { params })
+        .pipe(
+          timeout(10000), // 10 secondes timeout
+          retry(2)
+        );
     });
   }
 
@@ -72,7 +76,11 @@ export class AnalyticsService {
     
     return this.getCachedOrFetch(cacheKey, () => {
       let params = this.buildHttpParams(filters);
-      return this.http.get<DepartmentStatistics[]>(`${this.apiUrl}/departments`, { params });
+      return this.http.get<DepartmentStatistics[]>(`${this.apiUrl}/departments`, { params })
+        .pipe(
+          timeout(10000),
+          retry(2)
+        );
     });
   }
 
@@ -81,7 +89,11 @@ export class AnalyticsService {
     
     return this.getCachedOrFetch(cacheKey, () => {
       let params = this.buildHttpParams(filters);
-      return this.http.get<ContractTypeStatistics[]>(`${this.apiUrl}/contract-types`, { params });
+      return this.http.get<ContractTypeStatistics[]>(`${this.apiUrl}/contract-types`, { params })
+        .pipe(
+          timeout(10000),
+          retry(2)
+        );
     });
   }
 
@@ -90,7 +102,11 @@ export class AnalyticsService {
     
     return this.getCachedOrFetch(cacheKey, () => {
       let params = this.buildHttpParams(filters);
-      return this.http.get<SkillDemand[]>(`${this.apiUrl}/skills-demand`, { params });
+      return this.http.get<SkillDemand[]>(`${this.apiUrl}/skills-demand`, { params })
+        .pipe(
+          timeout(10000),
+          retry(2)
+        );
     });
   }
 
@@ -103,18 +119,39 @@ export class AnalyticsService {
     
     return this.getCachedOrFetch(cacheKey, () => {
       let params = this.buildHttpParams(filters);
-      return this.http.get<AdvancedDashboard>(`${this.apiUrl}/dashboard`, { params });
-    }).pipe(
+      return this.http.get<AdvancedDashboard>(`${this.apiUrl}/dashboard`, { params })
+        .pipe(
+          timeout(15000), // 15 secondes pour le dashboard complet
+          retry(1)
+        );
+    }, 1 * 60 * 1000).pipe( // Cache de 1 minute pour le dashboard
       tap(data => {
         this.dashboardSubject.next(data);
         this.setLoading(false);
       }),
       catchError(error => {
-        this.setError('Erreur lors du chargement du dashboard');
+        const errorMessage = this.getErrorMessage(error);
+        this.setError(errorMessage);
         this.setLoading(false);
         return throwError(error);
       })
     );
+  }
+
+  private getErrorMessage(error: any): string {
+    if (error.name === 'TimeoutError') {
+      return 'Timeout: Le serveur met trop de temps à répondre';
+    }
+    if (error.status === 0) {
+      return 'Erreur de connexion: Vérifiez que le serveur backend est démarré';
+    }
+    if (error.status === 404) {
+      return 'Endpoint non trouvé: Vérifiez la configuration de l\'API';
+    }
+    if (error.status >= 500) {
+      return 'Erreur serveur: Problème côté backend';
+    }
+    return error.error?.message || error.message || 'Erreur lors du chargement du dashboard';
   }
 
   // === RECOMMANDATIONS ===
@@ -122,7 +159,11 @@ export class AnalyticsService {
     const cacheKey = `recommendations_${employeeId}`;
     
     return this.getCachedOrFetch(cacheKey, () => {
-      return this.http.get<EmployeeSkillRecommendation>(`${this.apiUrl}/employee/${employeeId}/recommendations`);
+      return this.http.get<EmployeeSkillRecommendation>(`${this.apiUrl}/employee/${employeeId}/recommendations`)
+        .pipe(
+          timeout(10000),
+          retry(2)
+        );
     }, 10 * 60 * 1000); // Cache plus long pour les recommandations
   }
 
@@ -130,6 +171,7 @@ export class AnalyticsService {
     let params = this.buildHttpParams(filters);
     return this.http.get<EmployeeSkillRecommendation[]>(`${this.apiUrl}/employees/recommendations`, { params })
       .pipe(
+        timeout(10000),
         retry(2),
         catchError(this.handleError)
       );
@@ -141,6 +183,8 @@ export class AnalyticsService {
       employee_id: employeeId,
       job_description_id: jobDescriptionId
     }).pipe(
+      timeout(10000),
+      retry(1),
       catchError(this.handleError)
     );
   }
@@ -151,6 +195,8 @@ export class AnalyticsService {
     return this.http.post<ApplicationSuccessPrediction[]>(`${this.apiUrl}/predict-success/batch`, {
       predictions
     }).pipe(
+      timeout(15000),
+      retry(1),
       catchError(this.handleError)
     );
   }
@@ -175,6 +221,7 @@ export class AnalyticsService {
       params,
       responseType: 'blob'
     }).pipe(
+      timeout(30000), // 30 secondes pour la génération IA
       tap(() => this.setLoading(false)),
       catchError(error => {
         this.setError('Erreur lors de la génération du rapport IA');
@@ -190,6 +237,7 @@ export class AnalyticsService {
     return this.http.get(`${this.apiUrl}/employee/${employeeId}/ai-report`, {
       responseType: 'blob'
     }).pipe(
+      timeout(30000),
       tap(() => this.setLoading(false)),
       catchError(error => {
         this.setError('Erreur lors de la génération du rapport personnalisé');
@@ -202,23 +250,35 @@ export class AnalyticsService {
   // === DONNÉES EN TEMPS RÉEL ===
   getRealtimeStats(): Observable<RealtimeStats> {
     return this.http.get<RealtimeStats>(`${this.apiUrl}/realtime`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        timeout(5000),
+        catchError(this.handleError)
+      );
   }
 
   getSystemHealth(): Observable<SystemHealth> {
     return this.http.get<SystemHealth>(`${this.apiUrl}/health`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        timeout(5000),
+        catchError(this.handleError)
+      );
   }
 
   // === CONFIGURATION ===
   getAlertThresholds(): Observable<AlertThresholds> {
     return this.http.get<AlertThresholds>(`${this.apiUrl}/config/thresholds`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        timeout(5000),
+        catchError(this.handleError)
+      );
   }
 
   updateAlertThresholds(thresholds: AlertThresholds): Observable<any> {
     return this.http.put(`${this.apiUrl}/config/thresholds`, thresholds)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        timeout(10000),
+        catchError(this.handleError)
+      );
   }
 
   // === EXPORT ===
@@ -235,6 +295,7 @@ export class AnalyticsService {
       params,
       responseType: 'blob'
     }).pipe(
+      timeout(20000),
       catchError(this.handleError)
     );
   }
@@ -248,12 +309,14 @@ export class AnalyticsService {
     const cached = this.cache.get(key);
     
     if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      console.log(`Utilisation du cache pour: ${key}`);
       return new Observable(observer => {
         observer.next(cached.data);
         observer.complete();
       });
     }
 
+    console.log(`Récupération des données depuis l'API pour: ${key}`);
     return fetchFn().pipe(
       tap(data => {
         this.cache.set(key, {
@@ -261,6 +324,7 @@ export class AnalyticsService {
           timestamp: Date.now(),
           ttl
         });
+        console.log(`Données mises en cache pour: ${key}`);
       }),
       shareReplay(1),
       catchError(this.handleError)
@@ -269,6 +333,7 @@ export class AnalyticsService {
 
   clearCache(): void {
     this.cache.clear();
+    console.log('Cache analytics vidé');
   }
 
   invalidateCache(pattern?: string): void {
@@ -285,6 +350,7 @@ export class AnalyticsService {
     });
 
     keysToDelete.forEach(key => this.cache.delete(key));
+    console.log(`Cache invalidé pour le pattern: ${pattern}`);
   }
 
   // === UTILITAIRES ===
@@ -316,6 +382,9 @@ export class AnalyticsService {
     } else {
       // Erreur côté serveur
       switch (error.status) {
+        case 0:
+          errorMessage = 'Impossible de contacter le serveur. Vérifiez que le backend est démarré.';
+          break;
         case 400:
           errorMessage = 'Requête invalide';
           break;
@@ -326,13 +395,18 @@ export class AnalyticsService {
           errorMessage = 'Accès interdit';
           break;
         case 404:
-          errorMessage = 'Ressource non trouvée';
+          errorMessage = 'Endpoint analytics non trouvé. Vérifiez la configuration de l\'API.';
           break;
         case 500:
           errorMessage = 'Erreur serveur interne';
           break;
+        case 502:
+        case 503:
+        case 504:
+          errorMessage = 'Serveur temporairement indisponible';
+          break;
         default:
-          errorMessage = `Erreur ${error.status}: ${error.message}`;
+          errorMessage = error.error?.message || error.message || `Erreur ${error.status}`;
       }
     }
 
@@ -353,6 +427,10 @@ export class AnalyticsService {
       });
       
       keysToDelete.forEach(key => this.cache.delete(key));
+      
+      if (keysToDelete.length > 0) {
+        console.log(`Nettoyage automatique du cache: ${keysToDelete.length} entrées supprimées`);
+      }
     }, 60 * 60 * 1000); // 1 heure
   }
 

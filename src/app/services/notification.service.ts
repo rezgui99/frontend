@@ -87,49 +87,56 @@ export class NotificationService {
   }
 
   private generateRandomNotification(): void {
-    const notificationTypes = [
+    const notificationTypes: Array<{
+      type: 'success' | 'info' | 'warning' | 'error';
+      title: string;
+      message: string;
+      category: 'matching' | 'job_offer' | 'user_management';
+      data: any;
+      actions: NotificationAction[];
+    }> = [
       {
-        type: 'success' as const,
+        type: 'success',
         title: 'Matching élevé détecté',
         message: 'Marie Martin correspond à 89% pour le poste de Chef de Projet',
-        category: 'matching' as const,
+        category: 'matching',
         data: { employeeId: 2, jobId: 2, score: 89 },
         actions: [
-          { label: 'Voir le profil', action: 'view_profile', data: { employeeId: 2 }, style: 'primary' as const },
-          { label: 'Affecter au poste', action: 'assign_job', data: { employeeId: 2, jobId: 2 }, style: 'success' as const }
+          { label: 'Voir le profil', action: 'view_profile', data: { employeeId: 2 }, style: 'primary' },
+          { label: 'Affecter au poste', action: 'assign_job', data: { employeeId: 2, jobId: 2 }, style: 'success' }
         ]
       },
       {
-        type: 'info' as const,
+        type: 'info',
         title: 'Nouvelle offre publiée',
         message: 'L\'offre "Développeur React Senior" a été publiée avec succès',
-        category: 'job_offer' as const,
+        category: 'job_offer',
         data: { jobOfferId: 3 },
         actions: [
-          { label: 'Voir l\'offre', action: 'view_job_offer', data: { jobOfferId: 3 }, style: 'primary' as const }
+          { label: 'Voir l\'offre', action: 'view_job_offer', data: { jobOfferId: 3 }, style: 'primary' }
         ]
       },
       {
-        type: 'warning' as const,
+        type: 'warning',
         title: 'Fiche de poste en attente',
         message: 'La fiche "Analyste Business" nécessite une validation',
-        category: 'job_offer' as const,
+        category: 'job_offer',
         data: { jobDescriptionId: 4 },
         actions: [
-          { label: 'Valider', action: 'validate_job_description', data: { jobDescriptionId: 4 }, style: 'success' as const }
+          { label: 'Valider', action: 'validate_job_description', data: { jobDescriptionId: 4 }, style: 'success' }
         ]
       }
     ];
 
     if (this.authService.isAdmin) {
       notificationTypes.push({
-        type: 'info' as const,
+        type: 'info',
         title: 'Nouvel utilisateur RH',
         message: 'Sophie Dubois a été ajoutée avec le rôle HR',
-        category: 'user_management' as const,
+        category: 'user_management',
         data: { userId: 5 },
         actions: [
-          { label: 'Voir le profil', action: 'view_user', data: { userId: 5 }, style: 'primary' as const }
+          { label: 'Voir le profil', action: 'view_user', data: { userId: 5 }, style: 'primary' }
         ]
       });
     }
@@ -219,7 +226,7 @@ export class NotificationService {
     }
   }
 
-  private addNotification(notification: Notification): void {
+  public addNotification(notification: Notification): void {
     this.notifications.unshift(notification);
     
     // Limiter à 50 notifications max
@@ -271,6 +278,31 @@ export class NotificationService {
         }
       }, 300);
     }, 5000);
+  }
+
+  // Surcharge pour les alertes GPEC avec plus d'options
+  addGpecNotification(type: 'success' | 'info' | 'warning' | 'error', title: string, message: string, options?: any): void {
+    const id = this.generateId();
+    const notification: Notification = { 
+      id, 
+      type: type === 'warning' ? 'info' : type, 
+      title,
+      message,
+      timestamp: new Date(),
+      read: false,
+      userId: this.authService.currentUser?.id || 1,
+      category: 'system',
+      ...options 
+    };
+    
+    this.notifications.push(notification);
+    this.notificationsSubject.next(this.notifications);
+    
+    // Auto-remove after 8 seconds for GPEC alerts (longer for important alerts)
+    const timeout = options?.category === 'gpec_alert' ? 8000 : 5000;
+    setTimeout(() => {
+      this.deleteNotification(id);
+    }, timeout);
   }
 
   private getToastClass(type: string): string {
@@ -346,78 +378,5 @@ export class NotificationService {
 
   triggerJobDescriptionValidation(jobTitle: string, jobDescriptionId: number): void {
     this.notifyJobDescriptionValidated(jobTitle, jobDescriptionId);
-  }
-
-  private notifyHighMatching(employeeName: string, jobTitle: string, score: number, employeeId: number, jobId: number): void {
-    this.addNotification({
-      id: this.generateId(),
-      type: 'success',
-      title: 'Matching élevé détecté',
-      message: `${employeeName} correspond à ${score}% pour le poste de ${jobTitle}`,
-      timestamp: new Date(),
-      read: false,
-      userId: this.authService.currentUser?.id || 1,
-      category: 'matching',
-      data: { employeeId, jobId, score },
-      actions: [
-        { label: 'Voir le profil', action: 'view_profile', data: { employeeId }, style: 'primary' },
-        { label: 'Affecter au poste', action: 'assign_job', data: { employeeId, jobId }, style: 'success' }
-      ]
-    });
-  }
-
-  private notifyJobOfferPublished(jobTitle: string, jobOfferId: number): void {
-    this.addNotification({
-      id: this.generateId(),
-      type: 'info',
-      title: 'Offre d\'emploi publiée',
-      message: `L'offre "${jobTitle}" a été publiée avec succès`,
-      timestamp: new Date(),
-      read: false,
-      userId: this.authService.currentUser?.id || 1,
-      category: 'job_offer',
-      data: { jobOfferId },
-      actions: [
-        { label: 'Voir l\'offre', action: 'view_job_offer', data: { jobOfferId }, style: 'primary' }
-      ]
-    });
-  }
-
-  private notifyJobDescriptionValidated(jobTitle: string, jobDescriptionId: number): void {
-    this.addNotification({
-      id: this.generateId(),
-      type: 'success',
-      title: 'Fiche de poste validée',
-      message: `La fiche "${jobTitle}" a été validée et est prête à l'emploi`,
-      timestamp: new Date(),
-      read: false,
-      userId: this.authService.currentUser?.id || 1,
-      category: 'job_offer',
-      data: { jobDescriptionId },
-      actions: [
-        { label: 'Voir la fiche', action: 'view_job_description', data: { jobDescriptionId }, style: 'primary' },
-        { label: 'Créer une offre', action: 'create_job_offer', data: { jobDescriptionId }, style: 'success' }
-      ]
-    });
-  }
-
-  private notifyNewUserAdded(userName: string, userRole: string, userId: number): void {
-    if (this.authService.isAdmin) {
-      this.addNotification({
-        id: this.generateId(),
-        type: 'info',
-        title: 'Nouvel utilisateur ajouté',
-        message: `${userName} a été ajouté avec le rôle ${userRole}`,
-        timestamp: new Date(),
-        read: false,
-        userId: this.authService.currentUser?.id || 1,
-        category: 'user_management',
-        data: { userId, userRole },
-        actions: [
-          { label: 'Voir le profil', action: 'view_user', data: { userId }, style: 'primary' },
-          { label: 'Gérer les rôles', action: 'manage_roles', data: { userId }, style: 'secondary' }
-        ]
-      });
-    }
   }
 }
