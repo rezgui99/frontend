@@ -29,6 +29,14 @@ const jobOfferRoutes = require("./src/routes/joboffer");
  const analyticsRoutes = require("./src/routes/analytics");
  const gpecAlertsRoutes = require("./src/routes/gpec-alerts");
 
+// Routes candidats
+const candidateAuthRoutes = require("./src/routes/candidateAuth");
+const candidateCVRoutes = require("./src/routes/candidateCV");
+const candidateApplicationRoutes = require("./src/routes/candidateApplications");
+const candidateFavoritesRoutes = require("./src/routes/candidateFavorites");
+const publicJobOffersRoutes = require("./src/routes/publicJobOffers");
+const recruiterApplicationsRoutes = require("./src/routes/recruiterApplications");
+
 
 
 
@@ -63,6 +71,14 @@ app.use("/api/job-offers", jobOfferRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/gpec-alerts", gpecAlertsRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
+
+// Routes candidats
+app.use("/api/candidate/auth", candidateAuthRoutes);
+app.use("/api/candidate/cvs", candidateCVRoutes);
+app.use("/api/candidate/applications", candidateApplicationRoutes);
+app.use("/api/candidate/favorites", candidateFavoritesRoutes);
+app.use("/api/public/job-offers", publicJobOffersRoutes);
+app.use("/api/recruiter/applications", recruiterApplicationsRoutes);
 
 // 404 - Route non trouvée
 app.use((req, res, next) => {

@@ -18,6 +18,14 @@ import { EnhancedUserManagementComponent } from './pages/enhanced-user-managemen
 import { AdvancedAnalyticsComponent } from './pages/advanced-analytics/advanced-analytics.component';
 import { JobOffersListComponent } from './pages/job-offers-list/job-offers-list.component';
 
+// Candidate routes
+import { CandidateLoginComponent } from './pages/candidate/login/candidate-login.component';
+import { CandidateRegisterComponent } from './pages/candidate/register/candidate-register.component';
+import { CandidateDashboardComponent } from './pages/candidate/dashboard/candidate-dashboard.component';
+import { CandidateJobOffersComponent } from './pages/candidate/job-offers/candidate-job-offers.component';
+import { CandidateAuthGuard } from './guards/candidate-auth.guard';
+import { CandidateGuestGuard } from './guards/candidate-guest.guard';
+import { RecruiterApplicationsComponent } from './pages/recruiter/applications/recruiter-applications.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
@@ -46,5 +54,22 @@ export const routes: Routes = [
   // Unauthorized page
   { path: 'unauthorized', loadComponent: () => import('./pages/unauthorized/unauthorized.component').then(m => m.UnauthorizedComponent) },
   
+  // Candidate routes (public access)
+  { path: 'candidate/login', component: CandidateLoginComponent, canActivate: [CandidateGuestGuard] },
+  { path: 'candidate/register', component: CandidateRegisterComponent, canActivate: [CandidateGuestGuard] },
+  
+    // Protected candidate routes - Utilisez component au lieu de loadComponent si les composants existent
+  { path: 'candidate/dashboard', component: CandidateDashboardComponent, canActivate: [CandidateAuthGuard] },
+  { path: 'candidate/job-offers', component: CandidateJobOffersComponent, canActivate: [CandidateAuthGuard] },
+  { path: 'candidate/job-offers/:id', component: CandidateJobOffersComponent, canActivate: [CandidateAuthGuard] }, // Temporaire
+  { path: 'candidate/apply/:id', component: CandidateJobOffersComponent, canActivate: [CandidateAuthGuard] }, // Temporaire
+  { path: 'candidate/applications', component: CandidateLoginComponent, canActivate: [CandidateAuthGuard] },
+ // { path: 'candidate/applications/:id', component: CandidateApplicationDetailComponent, canActivate: [CandidateAuthGuard] },
+  { path: 'candidate/cvs', component: CandidateLoginComponent, canActivate: [CandidateAuthGuard] },
+  { path: 'candidate/favorites', component: CandidateRegisterComponent, canActivate: [CandidateAuthGuard] },
+  { path: 'candidate/profile', component: EditProfileComponent, canActivate: [CandidateAuthGuard] },
+  
+  // Recruiter application management
+  { path: 'recruiter/applications', component: RecruiterApplicationsComponent, canActivate: [AuthGuard], data: { roles: ['admin', 'hr'] } },
   { path: '**', redirectTo: '/home' }
 ];

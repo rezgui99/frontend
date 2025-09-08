@@ -6,8 +6,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-i
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+const generateToken = (userId, type = 'user') => {
+  return jwt.sign({ userId, type }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
 // Middleware to verify JWT token
