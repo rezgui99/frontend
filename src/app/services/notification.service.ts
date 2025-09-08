@@ -1,8 +1,11 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, interval } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { EmployeeService } from './employee.service';
+import { JobDescriptionService } from './job-description.service';
+import { MatchingService } from './matching.service';
 
 export interface Notification {
   id: string;
@@ -36,119 +39,208 @@ export class NotificationService {
   
   private apiUrl = `${environment.backendUrl}/notifications`;
   private notifications: Notification[] = [];
+  private lastNotificationCheck = new Date();
 
   constructor(
     private http: HttpClient,
-    private authService: AuthService
+    private authService: AuthService,
+    private employeeService: EmployeeService,
+    private jobDescriptionService: JobDescriptionService,
+    private matchingService: MatchingService
   ) {
     this.initializeNotifications();
   }
 
   private initializeNotifications(): void {
-    // Charger les notifications existantes
-    this.loadNotifications();
+    // Charger les notifications depuis le localStorage
+    this.loadStoredNotifications();
     
-    // Simuler des notifications en temps réel (en attendant WebSocket)
-    this.startNotificationSimulation();
+    // Démarrer la surveillance en temps réel
+    this.startRealTimeMonitoring();
+    
+    // Générer des notifications basées sur les données réelles
+    this.generateDataBasedNotifications();
   }
 
-  private loadNotifications(): void {
-    // Pour l'instant, on simule des notifications
-    const mockNotifications: Notification[] = [
-      {
-        id: '1',
-        type: 'success',
-        title: 'Matching élevé détecté',
-        message: 'Jean Dupont correspond à 92% pour le poste de Développeur Full Stack',
-        timestamp: new Date(),
-        read: false,
-        userId: this.authService.currentUser?.id || 1,
-        category: 'matching',
-        data: { employeeId: 1, jobId: 1, score: 92 },
-        actions: [
-          { label: 'Voir le profil', action: 'view_profile', data: { employeeId: 1 }, style: 'primary' },
-          { label: 'Lancer matching', action: 'start_matching', data: { jobId: 1 }, style: 'secondary' }
-        ]
+  private loadStoredNotifications(): void {
+    try {
+      const stored = localStorage.getItem('app_notifications');
+      if (stored) {
+        const parsedNotifications = JSON.parse(stored);
+        // Filtrer les notifications de moins de 7 jours
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        this.notifications = parsedNotifications.filter((n: Notification) => 
+          new Date(n.timestamp) > weekAgo
+        );
+        this.notificationsSubject.next(this.notifications);
+        this.updateUnreadCount();
       }
-    ];
-
-    this.notifications = mockNotifications;
-    this.notificationsSubject.next(this.notifications);
-    this.updateUnreadCount();
-  }
-
-  private startNotificationSimulation(): void {
-    // Simuler des notifications périodiques pour démonstration
-    setInterval(() => {
-      if (Math.random() > 0.7) { // 30% de chance toutes les 30 secondes
-        this.generateRandomNotification();
-      }
-    }, 30000);
-  }
-
-  private generateRandomNotification(): void {
-    const notificationTypes: Array<{
-      type: 'success' | 'info' | 'warning' | 'error';
-      title: string;
-      message: string;
-      category: 'matching' | 'job_offer' | 'user_management';
-      data: any;
-      actions: NotificationAction[];
-    }> = [
-      {
-        type: 'success',
-        title: 'Matching élevé détecté',
-        message: 'Marie Martin correspond à 89% pour le poste de Chef de Projet',
-        category: 'matching',
-        data: { employeeId: 2, jobId: 2, score: 89 },
-        actions: [
-          { label: 'Voir le profil', action: 'view_profile', data: { employeeId: 2 }, style: 'primary' },
-          { label: 'Affecter au poste', action: 'assign_job', data: { employeeId: 2, jobId: 2 }, style: 'success' }
-        ]
-      },
-      {
-        type: 'info',
-        title: 'Nouvelle offre publiée',
-        message: 'L\'offre "Développeur React Senior" a été publiée avec succès',
-        category: 'job_offer',
-        data: { jobOfferId: 3 },
-        actions: [
-          { label: 'Voir l\'offre', action: 'view_job_offer', data: { jobOfferId: 3 }, style: 'primary' }
-        ]
-      },
-      {
-        type: 'warning',
-        title: 'Fiche de poste en attente',
-        message: 'La fiche "Analyste Business" nécessite une validation',
-        category: 'job_offer',
-        data: { jobDescriptionId: 4 },
-        actions: [
-          { label: 'Valider', action: 'validate_job_description', data: { jobDescriptionId: 4 }, style: 'success' }
-        ]
-      }
-    ];
-
-    if (this.authService.isAdmin) {
-      notificationTypes.push({
-        type: 'info',
-        title: 'Nouvel utilisateur RH',
-        message: 'Sophie Dubois a été ajoutée avec le rôle HR',
-        category: 'user_management',
-        data: { userId: 5 },
-        actions: [
-          { label: 'Voir le profil', action: 'view_user', data: { userId: 5 }, style: 'primary' }
-        ]
-      });
+    } catch (error) {
+      console.error('Erreur lors du chargement des notifications:', error);
+      this.notifications = [];
     }
+  }
 
-    const randomNotification = notificationTypes[Math.floor(Math.random() * notificationTypes.length)];
-    
-    this.addNotification({
-      ...randomNotification,
-      id: this.generateId(),
-      timestamp: new Date(),
-      read: false,
-      userId: this.authService.currentUser?.id || 1
+  private saveNotifications(): void {
+    try {
+      localStorage.setItem('app_notifications', JSON.stringify(this.notifications));
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des notifications:', error);
+    }
+  }
+
+  private startRealTimeMonitoring(): void {
+    // Vérifier les nouvelles données toutes les 2 minutes
+    interval(2 * 60 * 1000).subscribe(() => {
+      if (this.authService.isAuthenticated) {
+        this.checkForDataUpdates();
+      }
+    });
+  }
+
+  private async checkForDataUpdates(): Promise<void> {
+    try {
+      // Vérifier les nouveaux employés
+      this.employeeService.getEmployees().subscribe({
+        next: (employees) => {
+          this.checkForNewEmployees(employees);
+        },
+        error: (error) => console.error('Erreur vérification employés:', error)
+      });
+
+      // Vérifier les nouvelles fiches de poste
+      this.jobDescriptionService.getJobDescriptions().subscribe({
+        next: (jobs) => {
+          this.checkForNewJobDescriptions(jobs);
+        },
+        error: (error) => console.error('Erreur vérification fiches:', error)
+      });
+    } catch (error) {
+      console.error('Erreur lors de la vérification des mises à jour:', error);
+    }
+  }
+
+  private checkForNewEmployees(employees: any[]): void {
+    const recentEmployees = employees.filter(emp => {
+      const hireDate = new Date(emp.hire_date);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return hireDate > weekAgo;
+    });
+
+    recentEmployees.forEach(employee => {
+      const notificationExists = this.notifications.some(n => 
+        n.data?.employeeId === employee.id && n.category === 'user_management'
+      );
+
+      if (!notificationExists) {
+        this.addNotification({
+          id: `new-employee-${employee.id}-${Date.now()}`,
+          type: 'info',
+          title: 'Nouvel employé ajouté',
+          message: `${employee.name} a rejoint l'équipe en tant que ${employee.position}`,
+          timestamp: new Date(),
+          read: false,
+          userId: this.authService.currentUser?.id || 1,
+          category: 'user_management',
+          data: { employeeId: employee.id },
+          actions: [
+            { label: 'Voir le profil', action: 'view_profile', data: { employeeId: employee.id }, style: 'primary' }
+          ]
+        });
+      }
+    });
+  }
+
+  private checkForNewJobDescriptions(jobs: any[]): void {
+    const recentJobs = jobs.filter(job => {
+      const createdDate = new Date(job.createdAt);
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      return createdDate > dayAgo;
+    });
+
+    recentJobs.forEach(job => {
+      const notificationExists = this.notifications.some(n => 
+        n.data?.jobDescriptionId === job.id && n.category === 'job_offer'
+      );
+
+      if (!notificationExists) {
+        this.addNotification({
+          id: `new-job-${job.id}-${Date.now()}`,
+          type: 'info',
+          title: 'Nouvelle fiche de poste',
+          message: `La fiche "${job.emploi}" a été créée et est prête pour le matching`,
+          timestamp: new Date(),
+          read: false,
+          userId: this.authService.currentUser?.id || 1,
+          category: 'job_offer',
+          data: { jobDescriptionId: job.id },
+          actions: [
+            { label: 'Voir la fiche', action: 'view_job_description', data: { jobDescriptionId: job.id }, style: 'primary' },
+            { label: 'Lancer matching', action: 'start_matching', data: { jobId: job.id }, style: 'success' }
+          ]
+        });
+      }
+    });
+  }
+
+  private generateDataBasedNotifications(): void {
+    // Générer des notifications basées sur l'analyse des données réelles
+    setTimeout(() => {
+      this.analyzeAndNotify();
+    }, 5000); // Attendre 5 secondes après l'initialisation
+  }
+
+  private analyzeAndNotify(): void {
+    // Analyser les employés sans compétences
+    this.employeeService.getEmployees().subscribe({
+      next: (employees) => {
+        const employeesWithoutSkills = employees.filter(emp => 
+          !emp.skills || emp.skills.length === 0
+        );
+
+        if (employeesWithoutSkills.length > 0) {
+          this.addNotification({
+            id: `no-skills-${Date.now()}`,
+            type: 'warning',
+            title: 'Employés sans compétences',
+            message: `${employeesWithoutSkills.length} employé(s) n'ont aucune compétence enregistrée`,
+            timestamp: new Date(),
+            read: false,
+            userId: this.authService.currentUser?.id || 1,
+            category: 'system',
+            actions: [
+              { label: 'Gérer les employés', action: 'view_employees', style: 'primary' }
+            ]
+          });
+        }
+
+        // Analyser les employés avec beaucoup de compétences (talents clés)
+        const talentedEmployees = employees.filter(emp => 
+          (emp.skills && emp.skills.length >= 8) || 
+          ((emp as any).EmployeeSkills && (emp as any).EmployeeSkills.length >= 8)
+        );
+
+        if (talentedEmployees.length > 0) {
+          talentedEmployees.slice(0, 2).forEach(employee => {
+            const skillsCount = employee.skills?.length || (employee as any).EmployeeSkills?.length || 0;
+            this.addNotification({
+              id: `talent-${employee.id}-${Date.now()}`,
+              type: 'success',
+              title: 'Talent clé identifié',
+              message: `${employee.name} possède ${skillsCount} compétences - Profil à forte valeur`,
+              timestamp: new Date(),
+              read: false,
+              userId: this.authService.currentUser?.id || 1,
+              category: 'matching',
+              data: { employeeId: employee.id },
+              actions: [
+                { label: 'Voir le profil', action: 'view_profile', data: { employeeId: employee.id }, style: 'primary' }
+              ]
+            });
+          });
+        }
+      },
+      error: (error) => console.error('Erreur analyse employés:', error)
     });
   }
 
@@ -236,6 +328,7 @@ export class NotificationService {
     
     this.notificationsSubject.next(this.notifications);
     this.updateUnreadCount();
+    this.saveNotifications();
     
     // Afficher une notification toast
     this.showToast(notification);
@@ -331,6 +424,7 @@ export class NotificationService {
       notification.read = true;
       this.notificationsSubject.next(this.notifications);
       this.updateUnreadCount();
+      this.saveNotifications();
     }
   }
 
@@ -338,18 +432,21 @@ export class NotificationService {
     this.notifications.forEach(n => n.read = true);
     this.notificationsSubject.next(this.notifications);
     this.updateUnreadCount();
+    this.saveNotifications();
   }
 
   deleteNotification(notificationId: string): void {
     this.notifications = this.notifications.filter(n => n.id !== notificationId);
     this.notificationsSubject.next(this.notifications);
     this.updateUnreadCount();
+    this.saveNotifications();
   }
 
   clearAllNotifications(): void {
     this.notifications = [];
     this.notificationsSubject.next(this.notifications);
     this.updateUnreadCount();
+    this.saveNotifications();
   }
 
   private updateUnreadCount(): void {
@@ -378,5 +475,26 @@ export class NotificationService {
 
   triggerJobDescriptionValidation(jobTitle: string, jobDescriptionId: number): void {
     this.notifyJobDescriptionValidated(jobTitle, jobDescriptionId);
+  }
+
+  // Nouvelle méthode pour les notifications système
+  notifySystemEvent(type: 'success' | 'info' | 'warning' | 'error', title: string, message: string, data?: any): void {
+    this.addNotification({
+      id: this.generateId(),
+      type,
+      title,
+      message,
+      timestamp: new Date(),
+      read: false,
+      userId: this.authService.currentUser?.id || 1,
+      category: 'system',
+      data
+    });
+  }
+
+  // Méthode pour déclencher des notifications basées sur les matching réels
+  checkAndNotifyHighMatching(): void {
+    // Cette méthode sera appelée après un matching pour vérifier les scores élevés
+    // Elle sera intégrée dans le service de matching
   }
 }

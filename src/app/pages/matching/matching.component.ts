@@ -10,6 +10,7 @@ import { Employee } from '../../models/employee.model';
 import { MatchingResult } from '../../models/matching.model';
 import { AnalyticsService } from '../../services/analytics.service';
 import { ApplicationSuccessPrediction } from '../../models/analytics.model';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-matching',
@@ -54,7 +55,8 @@ export class MatchingComponent implements OnInit {
     private jobDescriptionService: JobDescriptionService,
     private employeeService: EmployeeService,
     private matchingService: MatchingService,
-    private analyticsService: AnalyticsService
+    private analyticsService: AnalyticsService,
+    private notificationService: NotificationService
   ) { }
 
   ngOnInit(): void {
@@ -117,6 +119,24 @@ export class MatchingComponent implements OnInit {
     this.matchingService.getJobEmployeeSkillMatch(this.selectedJobId).subscribe({
       next: (results) => {
         this.matchingResults = results.sort((a, b) => b.score - a.score);
+        
+        // Notifier les matchings élevés
+        const highScoreMatches = results.filter(result => result.score >= 85);
+        highScoreMatches.forEach(match => {
+          const employee = this.getEmployeeFromResult(match);
+          const job = this.jobDescriptions.find(j => j.id === this.selectedJobId);
+          
+          if (employee && job) {
+            this.notificationService.notifyHighMatching(
+              employee.name,
+              job.emploi,
+              match.score,
+              match.employee_id,
+              this.selectedJobId!
+            );
+          }
+        });
+        
         this.calculateSuccessPredictions();
         this.loadingMatching = false;
       },

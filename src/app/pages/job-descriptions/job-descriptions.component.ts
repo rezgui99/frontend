@@ -7,6 +7,7 @@ import { JobDescriptionService } from '../../services/job-description.service';
 import { SkillService } from '../../services/skill.service';
 import { JobDescription } from '../../models/job-description.model';
 import { Skill, SkillLevel } from '../../models/employee.model';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-job-descriptions',
@@ -38,6 +39,7 @@ export class JobDescriptionsComponent implements OnInit {
   constructor(
     private jobDescriptionService: JobDescriptionService,
     private skillService: SkillService,
+    private notificationService: NotificationService,
     private formBuilder: FormBuilder,
     private router: Router
   ) {
@@ -257,6 +259,15 @@ export class JobDescriptionsComponent implements OnInit {
             this.jobDescriptions.push(newJobDescription);
             this.applyFilters();
             this.extractFilterOptions();
+            
+            // Notifier la création de la nouvelle fiche
+            this.notificationService.notifySystemEvent(
+              'success',
+              'Nouvelle fiche de poste créée',
+              `La fiche "${newJobDescription.emploi}" a été créée avec succès`,
+              { jobDescriptionId: newJobDescription.id }
+            );
+            
             this.cancelEdit();
             this.errorMessage = null;
           },
@@ -364,6 +375,8 @@ export class JobDescriptionsComponent implements OnInit {
           this.jobDescriptions = this.jobDescriptions.filter(job => job.id !== jobDescription.id);
           this.applyFilters();
           this.extractFilterOptions();
+          
+
           this.errorMessage = null;
         },
         error: (err) => {
