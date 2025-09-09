@@ -9,6 +9,11 @@
 
   <!-- Navigation Buttons -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-4xl">
+    <!-- Widget GPEC Alerts -->
+    <div class="md:col-span-2 lg:col-span-3 mb-6">
+      <app-gpec-alert-widget></app-gpec-alert-widget>
+    </div>
+
     <div class="card flex flex-col items-center p-8">
       <svg class="w-16 h-16 text-secondary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a3 3 0 015.356-1.857M17 20v-2c0-.653-.146-1.28-.42-1.857M7 20v-2c0-.653.146-1.28.42-1.857M7 20h10m0 0a3 3 0 00-5.356-1.857M7 16.143A3 3 0 0112 13c1.482 0 2.86.51 3.944 1.386M12 14a3 3 0 100-6 3 3 0 000 6z"></path></svg>
       <h2 class="text-2xl font-semibold text-dark mb-3">Gérer les Employés</h2>
@@ -52,44 +57,17 @@
     </div>
 
     <div class="card flex flex-col items-center p-8">
+      <svg class="w-16 h-16 text-secondary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+      <h2 class="text-2xl font-semibold text-dark mb-3">Alertes GPEC</h2>
+      <p class="text-gray-600 text-center mb-4">Système d'alerte intelligent pour anticiper les risques RH avant qu'ils ne deviennent critiques.</p>
+      <button routerLink="/gpec-alerts" class="btn btn-primary">Accéder aux alertes GPEC</button>
+    </div>
+
+    <div class="card flex flex-col items-center p-8">
       <svg class="w-16 h-16 text-secondary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a3 3 0 015.356-1.857M17 20v-2c0-.653-.146-1.28-.42-1.857M7 20v-2c0-.653.146-1.28.42-1.857M7 20h10m0 0a3 3 0 00-5.356-1.857M7 16.143A3 3 0 0112 13c1.482 0 2.86.51 3.944 1.386M12 14a3 3 0 100-6 3 3 0 000 6z"></path></svg>
       <h2 class="text-2xl font-semibold text-dark mb-3">Organigramme</h2>
       <p class="text-gray-600 text-center mb-4">Visualisez la structure organisationnelle et les relations hiérarchiques.</p>
       <button routerLink="/organigramme" class="btn btn-primary">Voir l'organigramme</button>
-    </div>
-  </div>
-
-  <!-- Section candidats -->
-  <div class="mt-12 pt-8 border-t border-gray-200">
-    <div class="text-center mb-8">
-      <h2 class="text-3xl font-bold text-gray-900 mb-4">Espace Candidat</h2>
-      <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-        Vous cherchez un emploi ? Découvrez nos offres et postulez en ligne facilement.
-      </p>
-    </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-      <div class="card flex flex-col items-center p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
-        <svg class="w-16 h-16 text-blue-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2H6a2 2 0 00-2 2v2m16 0a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h16z"></path>
-        </svg>
-        <h3 class="text-xl font-semibold text-gray-900 mb-3">Parcourir les offres</h3>
-        <p class="text-gray-600 text-center mb-4">Découvrez toutes nos opportunités d'emploi disponibles</p>
-        <a href="/candidate/job-offers" class="btn btn-primary">
-          Voir les offres d'emploi
-        </a>
-      </div>
-
-      <div class="card flex flex-col items-center p-8 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
-        <svg class="w-16 h-16 text-green-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-        </svg>
-        <h3 class="text-xl font-semibold text-gray-900 mb-3">Créer un compte</h3>
-        <p class="text-gray-600 text-center mb-4">Rejoignez notre plateforme pour postuler facilement</p>
-        <a href="/candidate/register" class="btn bg-green-600 text-white hover:bg-green-700">
-          S'inscrire comme candidat
-        </a>
-      </div>
     </div>
   </div>
 </div>

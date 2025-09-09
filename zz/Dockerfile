@@ -1,11 +1,22 @@
-FROM python:3.11-slim
+# Utilise Node 22.11.0 LTS officiel
+FROM node:22.11.0
 
-WORKDIR /app
+# Crée un répertoire de travail
+WORKDIR /usr/src/app
 
-COPY requirements.txt .
+# Copie les fichiers package
+COPY package*.json ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Installe les dépendances
+RUN npm install
 
+# Installation de nodemon en global
+RUN npm install -g nodemon
+# Copie le reste du code
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expose le port
+EXPOSE 3000
+
+# Commande de démarrage
+CMD ["nodemon", "server.js"]
