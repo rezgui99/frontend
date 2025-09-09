@@ -406,67 +406,32 @@ throw new Error('Method not implemented.');
       'Sousse, Tunisie',
       'Bizerte, Tunisie',
       'Nabeul, Tunisie',
-      'Télétravail complet',
-     
-    ];
-  }
-
-  applyLocationSuggestion(location: string): void {
-    this.jobOfferForm.patchValue({ location });
-  }
-
-  // Méthodes utilitaires pour gérer les compétences
-  getSkillNameSafe(skill: any): string {
-    if (!skill) return 'Compétence non définie';
-    
-    // Structure principale: skill.Skill.name (depuis les relations Sequelize)
-    if (skill.Skill && skill.Skill.name) {
-      return skill.Skill.name;
-    }
-    
-    // Structure alternative: skill.skill.name
-    if (skill.skill && skill.skill.name) {
-      return skill.skill.name;
-    }
-    
-    // Nom direct
     if (skill.name) {
       return skill.name;
-    }
-    
-    // Recherche par ID dans la liste des compétences chargées
-    if (skill.skill_id && this.skills && this.skills.length > 0) {
       const foundSkill = this.skills.find(s => s.id === skill.skill_id);
       if (foundSkill && foundSkill.name) {
         return foundSkill.name;
       }
     }
-    
+  getSkillNameFromRequiredSkill(skill: JobRequiredSkill): string {
     // Dernier recours: afficher l'ID si disponible
     if (skill.skill_id) {
       return `Compétence ID: ${skill.skill_id}`;
-    }
-    
+    if (skill.skill?.name) {
+      return skill.skill.name;
     return 'Compétence non définie';
   }
 
-  getSkillLevelNameSafe(skill: any): string {
-    console.log('getSkillLevelNameSafe called with:', skill);
+    if (skill.name) {
+      return skill.name;
     if (!skill) return 'Niveau non défini';
     
     // Structure principale: skill.SkillLevel.level_name (depuis les relations Sequelize)
-    if (skill.SkillLevel && skill.SkillLevel.level_name) {
-      console.log('Found level name via SkillLevel relation:', skill.SkillLevel.level_name);
-      return skill.SkillLevel.level_name;
-    }
+    if (skill.name) {
+      return skill.name;
+    if (skill.name) {
+      return skill.name;
     
-    // Structure alternative
-    if (skill.skill_level && skill.skill_level.level_name) {
-      console.log('Found level name via skill_level property:', skill.skill_level.level_name);
-      return skill.skill_level.level_name;
-    }
-    
-    // Nom direct
     if (skill.level_name) {
       console.log('Found level name directly:', skill.level_name);
       return skill.level_name;
