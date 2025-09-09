@@ -293,6 +293,18 @@ export class CandidateDashboardComponent implements OnInit {
   currentCandidate: Candidate | null = null;
   recentApplications: Application[] = [];
   recentFavorites: CandidateFavorite[] = [];
+  loading = false;
+  loadingFavorites = false;
+  
+  stats = {
+    totalApplications: 0,
+    interviewsScheduled: 0,
+    totalFavorites: 0,
+    totalCVs: 0
+  };
+
+  jobOfferStats = {
+    activeOffers: 0
   };
 
   constructor(
@@ -332,14 +344,31 @@ export class CandidateDashboardComponent implements OnInit {
     this.candidateService.getFavorites().subscribe({
       next: (favorites) => {
         this.recentFavorites = favorites.slice(0, 5);
+        this.stats.totalFavorites = favorites.length;
+        this.loadingFavorites = false;
       },
       error: (error) => {
+        console.error('Error loading favorites:', error);
+        this.loadingFavorites = false;
       }
     });
+    
     this.candidateService.getCVs().subscribe({
       next: (cvs) => {
+        this.stats.totalCVs = cvs.length;
+      },
       error: (error) => {
-        };
+        console.error('Error loading CVs:', error);
+      }
+    });
+    
+    // Charger les stats des offres d'emploi
+    this.candidateService.getJobOfferStats().subscribe({
+      next: (stats) => {
+        this.jobOfferStats = stats;
+      },
+      error: (error) => {
+        console.error('Error loading job offer stats:', error);
       }
     });
   }

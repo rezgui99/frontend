@@ -14,7 +14,6 @@ import { MatchingResult } from '../../models/matching.model';
 import { EmployeeSkillService } from '../../services/employee-skill.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { EmployeeSkillRecommendation, ApplicationSuccessPrediction } from '../../models/analytics.model';
-import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-employees',
@@ -85,7 +84,6 @@ export class EmployeesComponent implements OnInit {
     private matchingService: MatchingService,
     private employeeSkillService: EmployeeSkillService,
     private analyticsService: AnalyticsService,
-    private notificationService: NotificationService,
     private formBuilder: FormBuilder
   ) {
    this.employeeForm = this.formBuilder.group({
@@ -257,15 +255,6 @@ onEmployeeSubmit(): void {
           this.applyFilters();
           this.extractFilterOptions();
           this.successMessage = 'Employé créé avec succès';
-          
-          // Notifier la création du nouvel employé
-          this.notificationService.notifySystemEvent(
-            'success',
-            'Nouvel employé créé',
-            `${newEmployee.name} a été ajouté avec succès en tant que ${newEmployee.position}`,
-            { employeeId: newEmployee.id }
-          );
-          
           this.cancelEmployeeEdit();
           this.savingEmployee = false;
         },

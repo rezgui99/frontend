@@ -452,7 +452,10 @@
                 <!-- État vide -->
                 <div *ngIf="getSkillsCount(employee) === 0" class="text-center py-2">
                   <span class="text-xs text-gray-400 block mb-1">Aucune compétence</span>
-                  
+                  <button (click)="showAddSkillForm(employee)" 
+                          class="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded hover:bg-blue-100">
+                    ➕ Ajouter
+                  </button>
                 </div>
               </div>
             </td>
