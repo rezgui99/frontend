@@ -87,15 +87,18 @@ export class RecruiterApplicationsComponent implements OnInit {
 
   loadApplications(): void {
     this.loading = true;
+    console.log('🔍 Loading applications with filters:', this.filters);
     
     this.recruiterService.getAllApplications(this.filters).subscribe({
       next: (response) => {
+        console.log('📋 Applications response:', response);
         this.applications = response.applications;
         this.pagination = response.pagination;
         this.loading = false;
       },
       error: (error) => {
         console.error('Error loading applications:', error);
+        console.error('Error details:', error.error);
         this.loading = false;
       }
     });

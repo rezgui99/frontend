@@ -3,7 +3,7 @@ const nodemailer = require('nodemailer');
 const { Interview, Application, Candidate, JobOffer, User, sequelize } = db;
 
 // Configuration email
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
   secure: false,
@@ -251,145 +251,131 @@ const getAllInterviews = async (req, res) => {
   }
 };
 
-// GET interview statistics
 const getInterviewStatistics = async (req, res) => {
   try {
     console.log('📊 Getting interview statistics...');
-    console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    console.log('👤 Request user:', req.user.username, `(${req.user.role})`);
 
-    try {
-      // Essayer d'abord avec la vraie table Interview
-      const [
-        totalInterviews,
-        statusBreakdown,
-        typeBreakdown,
-        recruiterBreakdown,
-        averageScore,
-        upcomingInterviews
-      ] = await Promise.all([
-        Interview.count(),
-        Interview.findAll({
-          attributes: [
-            'status',
-            [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-          ],
-          group: ['status'],
-          raw: true
-        }),
-        Interview.findAll({
-          attributes: [
-            'interview_type',
-            [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-          ],
-          group: ['interview_type'],
-          raw: true
-        }),
-        Interview.findAll({
-          attributes: [
-            'interviewer_id',
-            [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-          ],
-          include: [{
-            model: User,
-            as: 'interviewer',
-            attributes: ['firstName', 'lastName']
-          }],
-          group: ['interviewer_id', 'interviewer.id', 'interviewer.firstName', 'interviewer.lastName'],
-          raw: false
-        }),
-        Interview.findAll({
-          attributes: [[sequelize.fn('AVG', sequelize.col('score')), 'avg_score']],
-          where: { score: { [sequelize.Sequelize.Op.ne]: null } },
-          raw: true
-        }),
-        Interview.count({
-          where: {
-            status: ['scheduled', 'confirmed'],
-            scheduled_date: {
-              [sequelize.Sequelize.Op.between]: [new Date(), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)]
-            }
+    const now = new Date();
+    const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // Requêtes statistiques
+    const [
+      totalInterviews,
+      upcomingInterviews,
+      statusBreakdown,
+      typeBreakdown,
+      interviewerBreakdown,
+      averageScore
+    ] = await Promise.all([
+      // Total interviews
+      db.Interview.count(),
+
+      // Upcoming interviews (this week)
+      db.Interview.count({
+        where: {
+          status: { [db.Sequelize.Op.in]: ['scheduled', 'confirmed'] },
+          scheduled_date: {
+            [db.Sequelize.Op.between]: [now, oneWeekFromNow]
           }
-        })
-      ]);
+        }
+      }),
 
-      const statistics = {
-        totalInterviews,
-        statusBreakdown: statusBreakdown.reduce((acc, item) => {
-          acc[item.status] = parseInt(item.count);
-          return acc;
-        }, {}),
-        typeBreakdown: typeBreakdown.reduce((acc, item) => {
-          acc[item.interview_type] = parseInt(item.count);
-          return acc;
-        }, {}),
-        interviewsByRecruiter: recruiterBreakdown.map(item => ({
-          interviewer_id: item.interviewer_id,
-          interviewer_name: `${item.interviewer?.firstName || ''} ${item.interviewer?.lastName || ''}`.trim(),
-          count: item.get('count')
-        })),
-        averageScore: parseFloat(averageScore[0]?.avg_score || 0),
-        upcomingInterviews,
-        completionRate: totalInterviews > 0 ? 
-          ((statusBreakdown.find(s => s.status === 'completed')?.count || 0) / totalInterviews) * 100 : 0,
-        averageDuration: 52,
-        successRate: 72.0
-      };
-
-      console.log('✅ Real interview statistics generated');
-      res.json(statistics);
-
-    } catch (dbError) {
-      console.log('⚠️ Interview table not found, using mock statistics:', dbError.message);
-      
-      // Statistiques simulées si la table n'existe pas
-      const statistics = {
-        totalInterviews: 25,
-        statusBreakdown: {
-          scheduled: 8,
-          confirmed: 5,
-          in_progress: 2,
-          completed: 7,
-          cancelled: 2,
-          rescheduled: 1
-        },
-        typeBreakdown: {
-          video: 15,
-          phone: 4,
-          in_person: 3,
-          technical: 2,
-          hr: 1
-        },
-        interviewsByRecruiter: [
-          {
-            interviewer_id: req.user?.id || 1,
-            interviewer_name: `${req.user?.firstName || 'Marie'} ${req.user?.lastName || 'Martin'}`,
-            count: 12
-          },
-          {
-            interviewer_id: 2,
-            interviewer_name: 'Jean Dupont',
-            count: 8
-          },
-          {
-            interviewer_id: 3,
-            interviewer_name: 'Sophie Dubois',
-            count: 5
-          }
+      // Status breakdown
+      db.Interview.findAll({
+        attributes: [
+          'status',
+          [db.Sequelize.fn('COUNT', db.Sequelize.col('Interview.id')), 'count']
         ],
-        averageScore: 78.5,
-        upcomingInterviews: 6,
-        completionRate: 84.2,
-        averageDuration: 52,
-        successRate: 72.0
-      };
+        group: ['status'],
+        raw: true
+      }),
 
-      console.log('✅ Mock interview statistics generated');
-      res.json(statistics);
-    }
+      // Type breakdown
+      db.Interview.findAll({
+        attributes: [
+          'interview_type',
+          [db.Sequelize.fn('COUNT', db.Sequelize.col('Interview.id')), 'count']
+        ],
+        group: ['interview_type'],
+        raw: true
+      }),
+
+      // Interviewer breakdown - FIX: Spécifier quelle table pour COUNT
+      db.Interview.findAll({
+        attributes: [
+          'interviewer_id',
+          [db.Sequelize.fn('COUNT', db.Sequelize.col('Interview.id')), 'count']
+        ],
+        include: [{
+          model: db.User,
+          as: 'interviewer',
+          attributes: ['id', 'firstName', 'lastName']
+        }],
+        group: [
+          'interviewer_id',
+          'interviewer.id',
+          'interviewer.firstName', 
+          'interviewer.lastName'
+        ],
+        raw: false
+      }),
+
+      // Average score
+      db.Interview.findOne({
+        attributes: [
+          [db.Sequelize.fn('AVG', db.Sequelize.col('score')), 'avg_score']
+        ],
+        where: {
+          score: { [db.Sequelize.Op.ne]: null }
+        },
+        raw: true
+      })
+    ]);
+
+    console.log('✅ Interviews found:', totalInterviews);
+
+    // Transformer les données pour le frontend
+    const statusStats = statusBreakdown.reduce((acc, item) => {
+      acc[item.status] = parseInt(item.count);
+      return acc;
+    }, {});
+
+    const typeStats = typeBreakdown.reduce((acc, item) => {
+      acc[item.interview_type] = parseInt(item.count);
+      return acc;
+    }, {});
+
+    const interviewerStats = interviewerBreakdown.map(item => ({
+      interviewer_id: item.interviewer_id,
+      interviewer_name: item.interviewer ? 
+        `${item.interviewer.firstName} ${item.interviewer.lastName}` : 
+        'Interviewer inconnu',
+      count: parseInt(item.dataValues.count)
+    }));
+
+    const statistics = {
+      total_interviews: totalInterviews,
+      upcoming_interviews: upcomingInterviews,
+      status_breakdown: statusStats,
+      type_breakdown: typeStats,
+      interviewer_breakdown: interviewerStats,
+      average_score: averageScore?.avg_score ? parseFloat(averageScore.avg_score).toFixed(1) : null,
+      period: {
+        from: now.toISOString(),
+        to: oneWeekFromNow.toISOString()
+      }
+    };
+
+    console.log('📈 Statistics generated successfully');
+    res.json(statistics);
 
   } catch (error) {
     console.error('❌ Error getting interview statistics:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des statistiques',
+      message: error.message 
+    });
   }
 };
 

@@ -13,8 +13,7 @@ const generateToken = (userId, type = 'user') => {
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
   try {
-    console.log('🔐 Auth middleware - URL:', req.method, req.originalUrl);
-    console.log('🔐 Auth middleware - Headers:', req.headers.authorization ? 'Bearer token present' : 'No auth header');
+    console.log('🔐 Auth middleware - Headers:', req.headers.authorization);
     
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -29,16 +28,7 @@ const authenticateToken = async (req, res, next) => {
 
     console.log('🔍 Auth middleware - Token found, verifying...');
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('✅ Auth middleware - Token decoded successfully for user ID:', decoded.userId);
-    
-    // Vérifier que c'est un token utilisateur (pas candidat)
-    if (decoded.type && decoded.type !== 'user') {
-      console.log('❌ Auth middleware - Invalid token type:', decoded.type);
-      return res.status(401).json({ 
-        error: 'Invalid token type',
-        message: 'Token invalide pour cette ressource'
-      });
-    }
+    console.log('✅ Auth middleware - Token decoded:', { userId: decoded.userId, type: decoded.type });
     
     const user = await User.findByPk(decoded.userId);
 
@@ -55,7 +45,6 @@ const authenticateToken = async (req, res, next) => {
       include: [{
         model: db.Role,
         as: 'roles',
-        where: { is_active: true },
         required: false,
         through: { attributes: [] }
       }]
@@ -83,7 +72,13 @@ const authenticateToken = async (req, res, next) => {
     };
     
     console.log('✅ Auth middleware - Authentication successful for user:', req.user.username);
-    console.log('🔑 Auth middleware - User has roles:', req.user.roles);
+    console.log('🔑 Auth middleware - Final user object:', {
+      id: req.user.id,
+      username: req.user.username,
+      role: req.user.role,
+      roles: req.user.roles,
+      isActive: req.user.isActive
+    });
     next();
   } catch (error) {
     console.error('❌ Auth middleware - Error:', error.message);

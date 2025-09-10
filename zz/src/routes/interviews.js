@@ -5,13 +5,15 @@ const { requireAdminOrHR, auditAction } = require('../middleware/roleAuth');
 
 const {
   getAllInterviews,
+  getInterviewStatistics,
+  getUpcomingInterviews,
+  getInterviewTypeLabels,
   scheduleInterview,
   updateInterview,
   cancelInterview,
   completeInterview,
   rescheduleInterview,
-  getInterviewStatistics,
-  getUpcomingInterviews
+  sendInterviewConfirmationEmail
 } = require('../controllers/interviews');
 
 // Middleware de logging pour debug
@@ -22,7 +24,7 @@ router.use((req, res, next) => {
   next();
 });
 
-// Middleware d'authentification pour toutes les routes
+// Middleware d'authentification + autorisation
 router.use(authenticateToken);
 router.use(requireAdminOrHR);
 
@@ -30,10 +32,14 @@ router.use(requireAdminOrHR);
 router.get('/', getAllInterviews);
 router.get('/statistics', getInterviewStatistics);
 router.get('/upcoming', getUpcomingInterviews);
+router.get('/interview-types', getInterviewTypeLabels);
+
 router.post('/', auditAction('CREATE', 'Interviews'), scheduleInterview);
 router.put('/:id', auditAction('UPDATE', 'Interviews'), updateInterview);
 router.patch('/:id/complete', auditAction('UPDATE', 'Interviews'), completeInterview);
 router.patch('/:id/reschedule', auditAction('UPDATE', 'Interviews'), rescheduleInterview);
 router.patch('/:id/cancel', auditAction('UPDATE', 'Interviews'), cancelInterview);
+
+router.post('/:id/send-confirmation', auditAction('NOTIFY', 'Interviews'), sendInterviewConfirmationEmail);
 
 module.exports = router;

@@ -1,14 +1,76 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { 
-  Interview, 
-  CreateInterviewRequest, 
-  UpdateInterviewRequest,
-  InterviewStatistics,
-  InterviewFilters
-} from '../models/interview.model';
 import { environment } from '../../environments/environment';
+
+export interface Interview {
+  id?: number;
+  application_id: number;
+  interviewer_id: number;
+  scheduled_date: string;
+  duration_minutes: number;
+  interview_type: string;
+  status: string;
+  meeting_link?: string;
+  notes?: string;
+  score?: number;
+  feedback?: string;
+  decision?: string;
+  reminder_sent: boolean;
+  application?: {
+    candidate: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string;
+    };
+    jobOffer: {
+      title: string;
+      company: string;
+    };
+  };
+  interviewer?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+export interface InterviewFilters {
+  status?: string;
+  interview_type?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface InterviewStatistics {
+  total_interviews: number;
+  upcoming_interviews: number;
+  status_breakdown: {
+    scheduled: number;
+    confirmed: number;
+    in_progress: number;
+    completed: number;
+    cancelled: number;
+    rescheduled: number;
+  };
+  type_breakdown: {
+    phone: number;
+    video: number;
+    in_person: number;
+    technical: number;
+    hr: number;
+    final: number;
+  };
+  interviewer_breakdown: Array<{
+    interviewer_id: number;
+    interviewer_name: string;
+    count: number;
+  }>;
+  average_score: number | null;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -16,87 +78,55 @@ import { environment } from '../../environments/environment';
 export class InterviewService {
   private apiUrl = `${environment.backendUrl}/interviews`;
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) {}
 
-  // Get all interviews with filters
-  getInterviews(filters?: InterviewFilters): Observable<{
-    interviews: Interview[];
-    pagination: {
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    };
-  }> {
+  getInterviews(filters: InterviewFilters = {}): Observable<any> {
     let params = new HttpParams();
     
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        const value = (filters as any)[key];
-        if (value !== undefined && value !== null && value !== '') {
-          params = params.set(key, value.toString());
-        }
-      });
-    }
+    // Ajouter les filtres aux paramètres de requête
+    Object.keys(filters).forEach(key => {
+      const value = filters[key as keyof InterviewFilters];
+      if (value !== undefined && value !== null && value !== '') {
+        params = params.set(key, value.toString());
+      }
+    });
 
-    console.log('🔍 InterviewService - Making request to:', `${this.apiUrl}`);
-    console.log('🔍 InterviewService - With params:', params.toString());
-
-    return this.http.get<any>(`${this.apiUrl}`, { params });
+    return this.http.get(`${this.apiUrl}`, { params });
   }
 
-  // Get upcoming interviews
-  getUpcomingInterviews(period: 'today' | 'week' = 'today'): Observable<Interview[]> {
-    const params = new HttpParams().set('period', period);
-    console.log('🔍 InterviewService - Getting upcoming interviews:', period);
-    return this.http.get<Interview[]>(`${this.apiUrl}/upcoming`, { params });
+  getStatistics(): Observable<InterviewStatistics> {
+    return this.http.get<InterviewStatistics>(`${this.apiUrl}/statistics`);
   }
 
-  // Schedule new interview
-  scheduleInterview(interviewData: CreateInterviewRequest): Observable<any> {
-    console.log('🔍 InterviewService - Scheduling interview:', interviewData);
+  getUpcomingInterviews(period: string = 'today'): Observable<Interview[]> {
+    return this.http.get<Interview[]>(`${this.apiUrl}/upcoming?period=${period}`);
+  }
+
+  getInterviewTypeLabels(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/interview-types`);
+  }
+
+  scheduleInterview(interviewData: any): Observable<any> {
     return this.http.post(`${this.apiUrl}`, interviewData);
   }
 
-  // Update interview
-  updateInterview(id: number, updateData: UpdateInterviewRequest): Observable<any> {
-    console.log('🔍 InterviewService - Updating interview:', id, updateData);
-    return this.http.put(`${this.apiUrl}/${id}`, updateData);
+  updateInterview(interviewId: number, updateData: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${interviewId}`, updateData);
   }
 
-  // Complete interview with feedback
-  completeInterview(id: number, completionData: {
-    score?: number;
-    feedback?: string;
-    decision: 'pass' | 'fail' | 'on_hold';
-    notes?: string;
-  }): Observable<any> {
-    console.log('🔍 InterviewService - Completing interview:', id, completionData);
-    return this.http.patch(`${this.apiUrl}/${id}/complete`, completionData);
+  cancelInterview(interviewId: number, reason: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${interviewId}/cancel`, { reason });
   }
 
-  // Reschedule interview
-  rescheduleInterview(id: number, rescheduleData: {
-    new_scheduled_date: string;
-    reason: string;
-  }): Observable<any> {
-    console.log('🔍 InterviewService - Rescheduling interview:', id, rescheduleData);
-    return this.http.patch(`${this.apiUrl}/${id}/reschedule`, rescheduleData);
+  completeInterview(interviewId: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${interviewId}/complete`, data);
   }
 
-  // Cancel interview
-  cancelInterview(id: number, reason: string): Observable<any> {
-    console.log('🔍 InterviewService - Cancelling interview:', id, reason);
-    return this.http.patch(`${this.apiUrl}/${id}/cancel`, { reason });
+  rescheduleInterview(interviewId: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${interviewId}/reschedule`, data);
   }
 
-  // Get interview statistics
-  getStatistics(dateFrom?: string, dateTo?: string): Observable<InterviewStatistics> {
-    let params = new HttpParams();
-    if (dateFrom) params = params.set('date_from', dateFrom);
-    if (dateTo) params = params.set('date_to', dateTo);
-
-    console.log('🔍 InterviewService - Getting statistics with params:', params.toString());
-    return this.http.get<InterviewStatistics>(`${this.apiUrl}/statistics`, { params });
+  sendInterviewConfirmation(interviewId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${interviewId}/send-confirmation`, {});
   }
 }

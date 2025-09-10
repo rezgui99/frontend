@@ -74,6 +74,9 @@ const getApplicationsForJobOffer = async (req, res) => {
 // Get all applications (Recruiter dashboard)
 const getAllApplications = async (req, res) => {
   try {
+    console.log('📋 Getting all applications for recruiter...');
+    console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    
     const { 
       status, 
       job_offer_id, 
@@ -103,21 +106,25 @@ const getAllApplications = async (req, res) => {
         {
           model: Candidate,
           as: 'candidate',
-          where: candidateWhere,
+          where: Object.keys(candidateWhere).length > 0 ? candidateWhere : undefined,
+          required: false,
           attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'location', 'bio']
         },
         {
           model: CandidateCV,
           as: 'cv',
+          required: false,
           attributes: ['id', 'title', 'file_path', 'file_name']
         },
         {
           model: JobOffer,
           as: 'jobOffer',
+          required: false,
           attributes: ['id', 'title', 'company', 'location'],
           include: [{
             model: JobDescription,
             as: 'jobDescription',
+            required: false,
             attributes: ['id', 'emploi', 'filiere_activite']
           }]
         }
@@ -127,6 +134,9 @@ const getAllApplications = async (req, res) => {
       order: [['applied_at', 'DESC']]
     });
 
+    console.log('✅ Applications found:', applications.length);
+    console.log('📊 Total count:', count);
+    
     res.json({
       applications,
       pagination: {

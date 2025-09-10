@@ -16,4 +16,5 @@ router.get('/', getCandidateApplications);
 router.get('/:id', getApplicationById);
 router.delete('/:id', withdrawApplication);
 
+
 module.exports = router;

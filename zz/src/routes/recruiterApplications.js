@@ -11,6 +11,14 @@ const {
   bulkUpdateApplications
 } = require('../controllers/recruiterApplications');
 
+// Middleware de logging pour debug
+router.use((req, res, next) => {
+  console.log(`🛣️  RecruiterApplications route: ${req.method} ${req.path}`);
+  console.log('🔑 Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
+  console.log('👤 User in request:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+  next();
+});
+
 // Toutes les routes nécessitent une authentification admin/HR
 router.use(authenticateToken);
 router.use(requireAdminOrHR);

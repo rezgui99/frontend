@@ -1,6 +1,6 @@
 const db = require("../../models/index");
 const nodemailer = require('nodemailer');
-const { Application, JobOffer, Candidate, CandidateCV, JobDescription, sequelize } = db;
+const { Application, JobOffer, Candidate, CandidateCV, JobDescription, Interview, User, sequelize } = db;
 
 // Configuration email
 const transporter = nodemailer.createTransport({
@@ -102,6 +102,39 @@ const applyToJobOffer = async (req, res) => {
       applied_at: new Date()
     }, { transaction: t });
 
+    console.log('✅ Application created:', {
+      id: application.id,
+      candidate_id: application.candidate_id,
+      job_offer_id: application.job_offer_id,
+      status: application.status
+    });
+
+    // === CRÉATION AUTOMATIQUE D'UN ENTRETIEN ===
+    try {
+      const interview = await createAutomaticInterview(application, t);
+      console.log('✅ Interview automatically created:', {
+        id: interview.id,
+        application_id: interview.application_id,
+        scheduled_date: interview.scheduled_date,
+        interviewer_id: interview.interviewer_id
+      });
+
+      // Mettre à jour le statut de la candidature
+      await application.update({
+        status: 'interview_scheduled',
+        confirmed_interview_date: interview.scheduled_date,
+        interview_link: interview.meeting_link
+      }, { transaction: t });
+
+      console.log('✅ Application status updated to interview_scheduled');
+
+    } catch (interviewError) {
+      console.error('❌ Error creating automatic interview:', interviewError);
+      // Ne pas faire échouer la candidature si l'entretien échoue
+      // L'entretien pourra être créé manuellement plus tard
+      console.log('⚠️ Application created but interview creation failed - manual scheduling required');
+    }
+
     // Envoyer email de confirmation au candidat
     const candidate = await Candidate.findByPk(req.candidate.id, { transaction: t });
     
@@ -172,6 +205,293 @@ const applyToJobOffer = async (req, res) => {
   }
 };
 
+// === FONCTION DE CRÉATION AUTOMATIQUE D'ENTRETIEN ===
+const createAutomaticInterview = async (application, transaction) => {
+  try {
+    console.log('🤖 Creating automatic interview for application:', application.id);
+    
+    // Récupérer les créneaux proposés par le candidat
+    const proposedSlots = application.proposed_interview_slots || [];
+    let selectedDate;
+    
+    if (proposedSlots.length > 0) {
+      // Utiliser le premier créneau proposé par le candidat
+      selectedDate = new Date(proposedSlots[0]);
+      console.log('📅 Using candidate proposed slot:', selectedDate.toLocaleString('fr-FR'));
+    } else {
+      // Calculer une date automatique si aucun créneau proposé
+      const minDays = 3;
+      const maxDays = 7;
+      const randomDays = Math.floor(Math.random() * (maxDays - minDays + 1)) + minDays;
+      
+      selectedDate = new Date();
+      selectedDate.setDate(selectedDate.getDate() + randomDays);
+      
+      // Programmer entre 9h et 17h en semaine
+      const dayOfWeek = selectedDate.getDay();
+      if (dayOfWeek === 0) { // Dimanche -> Lundi
+        selectedDate.setDate(selectedDate.getDate() + 1);
+      } else if (dayOfWeek === 6) { // Samedi -> Lundi
+        selectedDate.setDate(selectedDate.getDate() + 2);
+      }
+      
+      // Heure aléatoire entre 9h et 17h
+      const randomHour = Math.floor(Math.random() * 9) + 9; // 9-17h
+      const randomMinute = Math.random() > 0.5 ? 0 : 30; // 0 ou 30 minutes
+      selectedDate.setHours(randomHour, randomMinute, 0, 0);
+    }
+
+
+    console.log('📅 Interview scheduled for:', selectedDate.toLocaleString('fr-FR'));
+
+    // Trouver un recruteur disponible
+    const interviewer = await findAvailableInterviewer(selectedDate, transaction);
+    if (!interviewer) {
+      throw new Error('Aucun recruteur disponible trouvé');
+    }
+
+    console.log('👤 Interviewer assigned:', interviewer.firstName, interviewer.lastName);
+
+    // Générer un lien de réunion Google Meet correct
+    const meetingLink = generateMeetingLink();
+    console.log('🔗 Meeting link generated:', meetingLink);
+
+    // Déterminer le type d'entretien
+    const interviewType = determineInterviewType();
+    console.log('🎯 Interview type:', interviewType);
+
+    // Créer l'entretien
+    const interview = await Interview.create({
+      application_id: application.id,
+      interviewer_id: interviewer.id,
+      scheduled_date: selectedDate,
+      duration_minutes: 60,
+      interview_type: interviewType,
+      meeting_link: meetingLink,
+      status: 'scheduled',
+      decision: 'pending',
+      reminder_sent: false,
+      notes: proposedSlots.length > 0 ? 
+        `Entretien programmé sur créneau proposé par le candidat. Autres créneaux disponibles: ${proposedSlots.slice(1).map(slot => new Date(slot).toLocaleString('fr-FR')).join(', ')}` :
+        `Entretien automatiquement programmé suite à la candidature du ${new Date().toLocaleDateString('fr-FR')}`
+    }, { transaction });
+
+    // Envoyer email de notification à l'admin/recruteur
+    await sendInterviewNotificationToRecruiter(application, interview, interviewer);
+    
+    // Envoyer email de confirmation au candidat
+    await sendInterviewNotificationToCandidate(application, interview);
+
+    console.log('✅ Interview created successfully with ID:', interview.id);
+    return interview;
+
+  } catch (error) {
+    console.error('❌ Error in createAutomaticInterview:', error);
+    throw error;
+  }
+};
+
+// === FONCTION POUR TROUVER UN RECRUTEUR DISPONIBLE ===
+const findAvailableInterviewer = async (interviewDate, transaction) => {
+  try {
+    // 1. Récupérer tous les recruteurs (HR et Admin)
+    const recruiters = await User.findAll({
+      include: [{
+        model: db.Role,
+        as: 'roles',
+        where: {
+          name: { [sequelize.Sequelize.Op.in]: ['hr', 'admin'] },
+          is_active: true
+        },
+        required: true
+      }],
+      where: { isActive: true },
+      transaction
+    });
+
+    if (recruiters.length === 0) {
+      throw new Error('Aucun recruteur actif trouvé');
+    }
+
+    console.log('👥 Available recruiters found:', recruiters.length);
+
+    // 2. Vérifier la disponibilité (pas d'entretien dans les 2h avant/après)
+    const timeBuffer = 2 * 60 * 60 * 1000; // 2 heures en millisecondes
+    const startTime = new Date(interviewDate.getTime() - timeBuffer);
+    const endTime = new Date(interviewDate.getTime() + timeBuffer);
+
+    for (const recruiter of recruiters) {
+      const conflictingInterviews = await Interview.count({
+        where: {
+          interviewer_id: recruiter.id,
+          scheduled_date: {
+            [sequelize.Sequelize.Op.between]: [startTime, endTime]
+          },
+          status: { [sequelize.Sequelize.Op.in]: ['scheduled', 'confirmed', 'in_progress'] }
+        },
+        transaction
+      });
+
+      if (conflictingInterviews === 0) {
+        console.log('✅ Available recruiter found:', recruiter.firstName, recruiter.lastName);
+        return recruiter;
+      }
+    }
+
+    // 3. Si aucun recruteur disponible, prendre celui avec le moins d'entretiens
+    const recruiterWorkload = await Promise.all(
+      recruiters.map(async (recruiter) => {
+        const interviewCount = await Interview.count({
+          where: {
+            interviewer_id: recruiter.id,
+            scheduled_date: {
+              [sequelize.Sequelize.Op.gte]: new Date(),
+              [sequelize.Sequelize.Op.lte]: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            },
+            status: { [sequelize.Sequelize.Op.in]: ['scheduled', 'confirmed'] }
+          },
+          transaction
+        });
+
+        return { recruiter, interviewCount };
+      })
+    );
+
+    // Trier par charge de travail croissante
+    recruiterWorkload.sort((a, b) => a.interviewCount - b.interviewCount);
+    
+    const selectedRecruiter = recruiterWorkload[0].recruiter;
+    console.log('✅ Recruiter with lowest workload selected:', 
+      selectedRecruiter.firstName, selectedRecruiter.lastName, 
+      '(', recruiterWorkload[0].interviewCount, 'interviews this week)');
+
+    return selectedRecruiter;
+
+  } catch (error) {
+    console.error('❌ Error finding available interviewer:', error);
+    throw error;
+  }
+};
+
+// === FONCTION POUR GÉNÉRER UN LIEN DE RÉUNION ===
+const generateMeetingLink = () => {
+  // Générer un lien Google Meet valide
+  const characters = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  
+  // Format Google Meet: https://meet.google.com/xxx-xxxx-xxx
+  const part1 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  const part2 = Array.from({length: 4}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  const part3 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  
+  return `https://meet.google.com/${part1}-${part2}-${part3}`;
+};
+
+// === FONCTION POUR DÉTERMINER LE TYPE D'ENTRETIEN ===
+const determineInterviewType = () => {
+  // Logique pour déterminer le type d'entretien
+  // Peut être basée sur le poste, l'expérience, etc.
+  const interviewTypes = [
+    { type: 'video', weight: 60 },      // 60% de chance
+    { type: 'phone', weight: 25 },      // 25% de chance
+    { type: 'hr', weight: 10 },         // 10% de chance
+    { type: 'technical', weight: 5 }    // 5% de chance
+  ];
+
+  const random = Math.random() * 100;
+  let cumulative = 0;
+
+  for (const { type, weight } of interviewTypes) {
+    cumulative += weight;
+    if (random <= cumulative) {
+      return type;
+    }
+  }
+
+  return 'video'; // Fallback
+};
+
+// === FONCTION POUR ENVOYER EMAIL D'ENTRETIEN ===
+const sendInterviewNotificationToCandidate = async (application, interview) => {
+  try {
+    const candidate = await Candidate.findByPk(application.candidate_id);
+    const jobOffer = await JobOffer.findByPk(application.job_offer_id);
+    
+    if (!candidate || !jobOffer) {
+      console.error('❌ Candidate or JobOffer not found for email notification');
+      return;
+    }
+    
+    const interviewDate = new Date(interview.scheduled_date);
+    
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: candidate.email,
+      subject: `🎉 Entretien programmé - ${jobOffer.title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #2196F3; text-align: center;">Entretien Programmé !</h1>
+          
+          <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>Félicitations ${candidate.firstName} ${candidate.lastName} !</h2>
+            <p>Votre candidature pour le poste de <strong>${jobOffer.title}</strong> chez <strong>${jobOffer.company}</strong> a retenu notre attention.</p>
+            <p>Nous avons automatiquement programmé un entretien pour vous.</p>
+          </div>
+
+          <div style="background-color: #fff; border: 2px solid #2196F3; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #2196F3; margin-top: 0;">📅 Détails de l'entretien</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin: 10px 0;"><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</li>
+              <li style="margin: 10px 0;"><strong>⏱️ Durée :</strong> ${interview.duration_minutes} minutes</li>
+              <li style="margin: 10px 0;"><strong>🎯 Type :</strong> ${getInterviewTypeLabel(interview.interview_type)}</li>
+              <li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${interview.meeting_link}" style="color: #2196F3;">${interview.meeting_link}</a></li>
+              <li style="margin: 10px 0;"><strong>📍 Poste :</strong> ${jobOffer.title}</li>
+              <li style="margin: 10px 0;"><strong>🏢 Entreprise :</strong> ${jobOffer.company}</li>
+            </ul>
+          </div>
+
+          <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
+            <ul style="color: #6b7280; font-size: 14px;">
+              <li>Testez votre connexion et votre matériel 15 minutes avant</li>
+              <li>Préparez vos questions sur l'entreprise et le poste</li>
+              <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
+              <li>Trouvez un endroit calme et bien éclairé</li>
+              <li>Préparez des exemples concrets de vos réalisations</li>
+            </ul>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="color: #10b981; font-weight: bold;">🍀 Bonne chance pour votre entretien !</p>
+            <p style="color: #6b7280; font-size: 12px;">
+              Cet entretien a été automatiquement programmé. Si vous avez des questions ou besoin de reporter, 
+              contactez notre équipe RH.
+            </p>
+          </div>
+        </div>
+      `
+    });
+
+    console.log('✅ Interview notification email sent to candidate');
+
+  } catch (emailError) {
+    console.error('❌ Error sending interview notification email:', emailError);
+  }
+};
+
+// === FONCTION POUR OBTENIR LE LABEL DU TYPE D'ENTRETIEN ===
+const getInterviewTypeLabel = (type) => {
+  const labels = {
+    'phone': 'Entretien téléphonique',
+    'video': 'Entretien vidéo',
+    'in_person': 'Entretien en personne',
+    'technical': 'Entretien technique',
+    'hr': 'Entretien RH',
+    'final': 'Entretien final'
+  };
+  return labels[type] || 'Entretien';
+};
+
 // Get candidate's applications
 const getCandidateApplications = async (req, res) => {
   try {
@@ -201,7 +521,26 @@ const getCandidateApplications = async (req, res) => {
       order: [['applied_at', 'DESC']]
     });
 
-    res.json(applications);
+    // Enrichir les candidatures avec les informations d'entretien
+    const applicationsWithInterviews = await Promise.all(
+      applications.map(async (application) => {
+        const interview = await Interview.findOne({
+          where: { application_id: application.id },
+          include: [{
+            model: User,
+            as: 'interviewer',
+            attributes: ['id', 'firstName', 'lastName', 'email']
+          }]
+        });
+
+        return {
+          ...application.toJSON(),
+          interview: interview ? interview.toJSON() : null
+        };
+      })
+    );
+
+    res.json(applicationsWithInterviews);
   } catch (error) {
     console.error('Error getting candidate applications:', error);
     res.status(500).json({ error: error.message });
@@ -211,18 +550,26 @@ const getCandidateApplications = async (req, res) => {
 // Get single application
 const getApplicationById = async (req, res) => {
   try {
+    const applicationId = parseInt(req.params.id);
+    
+    if (isNaN(applicationId)) {
+      return res.status(400).json({ error: 'ID de candidature invalide' });
+    }
+    
     const application = await Application.findOne({
-      where: {
-        id: req.params.id,
-        candidate_id: req.candidate.id
+      where: { 
+        id: applicationId,
+        candidate_id: req.candidate.id 
       },
       include: [
         {
           model: JobOffer,
           as: 'jobOffer',
+          required: false,
           include: [{
             model: JobDescription,
-            as: 'jobDescription'
+            as: 'jobDescription',
+            required: false
           }]
         },
         {
@@ -236,7 +583,21 @@ const getApplicationById = async (req, res) => {
       return res.status(404).json({ error: 'Candidature non trouvée' });
     }
 
-    res.json(application);
+    // Récupérer l'entretien associé s'il existe
+    const interview = await Interview.findOne({
+      where: { application_id: application.id },
+      include: [{
+        model: User,
+        as: 'interviewer',
+        required: false,
+        attributes: ['id', 'firstName', 'lastName', 'email']
+      }]
+    });
+
+    res.json({
+      ...application.toJSON(),
+      interview: interview ? interview.toJSON() : null
+    });
   } catch (error) {
     console.error('Error getting application:', error);
     res.status(500).json({ error: error.message });
@@ -267,6 +628,21 @@ const withdrawApplication = async (req, res) => {
       return res.status(400).json({ 
         error: 'Cette candidature ne peut plus être retirée' 
       });
+    }
+
+    // Annuler l'entretien associé s'il existe
+    const associatedInterview = await Interview.findOne({
+      where: { application_id: application.id },
+      transaction: t
+    });
+
+    if (associatedInterview && ['scheduled', 'confirmed'].includes(associatedInterview.status)) {
+      await associatedInterview.update({
+        status: 'cancelled',
+        notes: `${associatedInterview.notes || ''}\n\nAnnulé automatiquement suite au retrait de candidature le ${new Date().toLocaleString('fr-FR')}`
+      }, { transaction: t });
+
+      console.log('✅ Associated interview cancelled:', associatedInterview.id);
     }
 
     await application.destroy({ transaction: t });
@@ -498,5 +874,9 @@ module.exports = {
   updateCV,
   deleteCV,
   setPrimaryCV,
-  downloadCV
+  downloadCV,
+  // Exporter les nouvelles fonctions pour utilisation dans d'autres modules
+  createAutomaticInterview,
+  findAvailableInterviewer,
+  generateMeetingLink
 };

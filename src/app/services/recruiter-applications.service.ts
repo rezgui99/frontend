@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
 import { Application } from '../models/candidate.model';
 import { environment } from '../../environments/environment';
 
@@ -27,6 +28,8 @@ export class RecruiterApplicationsService {
 
   // Obtenir toutes les candidatures
   getAllApplications(filters?: any): Observable<any> {
+    console.log('🔍 RecruiterApplicationsService - Getting all applications with filters:', filters);
+    
     let params = new HttpParams();
     
     if (filters) {
@@ -38,7 +41,16 @@ export class RecruiterApplicationsService {
       });
     }
 
-    return this.http.get(this.apiUrl, { params });
+    console.log('🔍 RecruiterApplicationsService - Making request to:', this.apiUrl);
+    console.log('🔍 RecruiterApplicationsService - With params:', params.toString());
+    
+    return this.http.get(this.apiUrl, { params }).pipe(
+      tap(response => console.log('📋 RecruiterApplicationsService - Response:', response)),
+      catchError(error => {
+        console.error('❌ RecruiterApplicationsService - Error:', error);
+        throw error;
+      })
+    );
   }
 
   // Mettre à jour le statut d'une candidature

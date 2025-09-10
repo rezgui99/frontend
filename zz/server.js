@@ -28,6 +28,7 @@ const userManagementRoutes = require("./src/routes/userManagement");
 const jobOfferRoutes = require("./src/routes/joboffer");
  const analyticsRoutes = require("./src/routes/analytics");
  const gpecAlertsRoutes = require("./src/routes/gpec-alerts");
+const { authenticateToken } = require("./src/middleware/auth");
 
 // Routes candidats
 const candidateAuthRoutes = require("./src/routes/candidateAuth");
@@ -80,7 +81,7 @@ app.use("/api/candidate/cvs", candidateCVRoutes);
 app.use("/api/candidate/applications", candidateApplicationRoutes);
 app.use("/api/candidate/favorites", candidateFavoritesRoutes);
 app.use("/api/public/job-offers", publicJobOffersRoutes);
-app.use("/api/recruiter/applications", recruiterApplicationsRoutes);
+app.use("/api/recruiter/applications", authenticateToken, recruiterApplicationsRoutes);
 
 // Routes entretiens
 app.use("/api/interviews", interviewRoutes);
