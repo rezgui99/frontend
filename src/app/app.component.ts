@@ -21,8 +21,13 @@ export class AppComponent {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event: any) => {
         // Masquer la sidebar sur certaines routes
-        const authPages = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password']; 
-        this.showSidebar = !authPages.includes(event.urlAfterRedirects);
+        const authPages = [
+          '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password',
+          '/welcome', '/candidate/login', '/candidate/register', '/candidate/dashboard',
+          '/candidate/job-offers', '/candidate/apply', '/candidate/applications', 
+          '/candidate/cvs', '/candidate/favorites'
+        ]; 
+        this.showSidebar = !authPages.some(page => event.urlAfterRedirects.startsWith(page));
       });
   }
   title = 'Smarthire';

@@ -78,8 +78,8 @@ export class CandidateRegisterComponent implements OnInit {
 
     // Convert camelCase to snake_case for the API request
     const registerData = {
-      first_name: this.registerForm.value.firstName,
-      last_name: this.registerForm.value.lastName,
+      firstName: this.registerForm.value.firstName,
+      lastName: this.registerForm.value.lastName,
       email: this.registerForm.value.email,
       phone: this.registerForm.value.phone,
       location: this.registerForm.value.location,

@@ -4,6 +4,17 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CandidateService } from '../../../services/candidate.service';
 import { JobOffer } from '../../../models/candidate.model';
 
+// Add interface for better type safety
+interface JobOfferDescription {
+  requiredSkills?: Array<{
+    Skill?: { name: string };
+    name?: string;
+    SkillLevel?: { level_name: string };
+    level_name?: string;
+  }>;
+  [key: string]: any;
+}
+
 @Component({
   selector: 'app-candidate-job-offer-detail',
   standalone: true,
@@ -83,11 +94,14 @@ export class CandidateJobOfferDetailComponent implements OnInit {
   }
 
   hasRequiredSkills(): boolean {
-    return !!(this.jobOffer?.description && 
-             typeof this.jobOffer.description === 'object' && 
-             this.jobOffer.description.requiredSkills && 
-             Array.isArray(this.jobOffer.description.requiredSkills) &&
-             this.jobOffer.description.requiredSkills.length > 0);
+    if (!this.jobOffer?.description) return false;
+    
+    // Assertion de type pour indiquer à TypeScript ce qu'on attend
+    const description = this.jobOffer.description as unknown as JobOfferDescription;
+    
+    return !!(description.requiredSkills && 
+             Array.isArray(description.requiredSkills) &&
+             description.requiredSkills.length > 0);
   }
 
   getRequiredSkills(): any[] {
@@ -110,4 +124,4 @@ export class CandidateJobOfferDetailComponent implements OnInit {
   formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString('fr-FR');
   }
-}
+    }

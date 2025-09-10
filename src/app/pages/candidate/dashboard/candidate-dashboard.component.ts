@@ -259,7 +259,7 @@ import { Candidate, Application, CandidateFavorite } from '../../../models/candi
                   <div class="flex-1">
                     <h4 class="text-lg font-medium text-gray-900">{{ favorite.jobOffer?.title }}</h4>
                     <p class="text-sm text-gray-600">{{ favorite.jobOffer?.company }} • {{ favorite.jobOffer?.location }}</p>
-                    <p class="text-xs text-gray-500 mt-1">Ajouté aux favoris le {{ formatDate(favorite.createdAt!) }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Ajouté aux favoris le {{ formatDate(favorite.created_at!) }}</p>
                   </div>
                   <div class="flex items-center space-x-3">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

@@ -7,10 +7,8 @@ import {
   CandidateFavorite,
   JobApplicationRequest,
   JobOfferFilters,
-  PublicJobOffersResponse,
   JobOffer
 } from '../models/candidate.model';
-//import { JobOffer } from '../models/job-description.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({
