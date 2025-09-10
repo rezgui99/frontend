@@ -17,6 +17,14 @@ const {
   generateGPECReport
 } = require('../controllers/gpec-alerts');
 
+// Middleware de logging pour debug
+router.use((req, res, next) => {
+  console.log(`🛣️  GPEC route: ${req.method} ${req.path}`);
+  console.log('🔑 Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
+  console.log('👤 User in request:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+  next();
+});
+
 // Middleware d'authentification pour toutes les routes
 router.use(authenticateToken);
 router.use(requireAdminOrHR);

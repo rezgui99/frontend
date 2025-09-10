@@ -147,6 +147,9 @@ const createUser = async (req, res) => {
 // Lister tous les utilisateurs (Admin seulement)
 const getAllUsers = async (req, res) => {
   try {
+    console.log('📋 GetAllUsers - Request from user:', req.user?.username);
+    console.log('📋 GetAllUsers - User roles:', req.user?.roles);
+    
     const { page = 1, limit = 10, search, role, isActive } = req.query;
     const offset = (page - 1) * limit;
 
@@ -188,6 +191,8 @@ const getAllUsers = async (req, res) => {
       distinct: true
     });
 
+    console.log('📋 GetAllUsers - Found users:', users.length);
+    
     res.json({
       users: users.map(user => user.toJSON()),
       pagination: {
@@ -624,6 +629,9 @@ const removeRole = async (req, res) => {
 // Lister tous les rôles (Admin et HR)
 const getAllRoles = async (req, res) => {
   try {
+    console.log('🎭 GetAllRoles - Request from user:', req.user?.username);
+    console.log('🎭 GetAllRoles - User roles:', req.user?.roles);
+    
     const roles = await Role.findAll({
       include: [{
         model: User,
@@ -635,6 +643,8 @@ const getAllRoles = async (req, res) => {
       order: [['name', 'ASC']]
     });
 
+    console.log('🎭 GetAllRoles - Found roles:', roles.length);
+    
     res.json({
       roles: roles.map(role => ({
         ...role.toJSON(),

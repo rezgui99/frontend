@@ -34,6 +34,9 @@ const includeRelations = () => [
 // GET all job offers
 const findAllJobOffers = async (req, res) => {
   try {
+    console.log('📋 Getting job offers with filters:', req.query);
+    console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    
     const { 
       status, 
       contract_type, 
@@ -82,6 +85,7 @@ const findAllJobOffers = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    console.log('✅ Job offers found:', jobOffers.length);
     res.json({
       jobOffers,
       pagination: {

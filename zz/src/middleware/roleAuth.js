@@ -6,7 +6,12 @@ const {  User, Role, UserRole  } = db;
 const requireRole = (...requiredRoles) => {
   return async (req, res, next) => {
     try {
+      console.log('🔒 RequireRole middleware - Checking access for:', req.originalUrl);
+      console.log('🔒 RequireRole middleware - Required roles:', requiredRoles);
+      console.log('🔒 RequireRole middleware - User roles:', req.user?.roles);
+      
       if (!req.user) {
+        console.log('❌ RequireRole middleware - No user in request');
         return res.status(401).json({
           error: 'Authentication required',
           message: 'Authentification requise'
@@ -15,9 +20,12 @@ const requireRole = (...requiredRoles) => {
 
       // Les rôles sont déjà chargés dans req.user par le middleware auth
       const userRoles = req.user.roles || [];
+      
       const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
 
       if (!hasRequiredRole) {
+        console.log('❌ RequireRole middleware - Access denied for:', req.originalUrl);
+        console.log('❌ Required:', requiredRoles, 'User has:', userRoles);
         return res.status(403).json({
           error: 'Insufficient permissions',
           message: `Accès refusé. Rôles requis: ${requiredRoles.join(', ')}`
@@ -26,6 +34,7 @@ const requireRole = (...requiredRoles) => {
 
       // Ajouter les rôles à la requête pour utilisation ultérieure
       req.userRoles = userRoles;
+      console.log('✅ RequireRole middleware - Access granted for:', req.originalUrl);
       next();
     } catch (error) {
       console.error('Role verification error:', error);

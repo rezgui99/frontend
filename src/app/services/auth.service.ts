@@ -34,17 +34,25 @@ export class AuthService {
     const token = localStorage.getItem('auth_token');
     const user = localStorage.getItem('current_user');
 
+    console.log('🔍 AuthService - Loading from storage - Token:', token ? 'Found' : 'Not found');
+    console.log('🔍 AuthService - Loading from storage - User:', user ? 'Found' : 'Not found');
     if (token && user) {
       try {
         this.tokenSubject.next(token);
         this.currentUserSubject.next(JSON.parse(user));
+        console.log('✅ AuthService - Token and user loaded successfully');
       } catch {
+        console.error('❌ AuthService - Error parsing stored data, clearing');
         this.clearAuthData();
       }
+    } else {
+      console.log('⚠️ AuthService - No token or user in storage');
     }
   }
 
   private setAuthData(token: string, user: User): void {
+    console.log('💾 AuthService - Setting auth data - Token:', token ? 'Present' : 'Missing');
+   
     localStorage.setItem('auth_token', token);
     localStorage.setItem('current_user', JSON.stringify(user));
     this.tokenSubject.next(token);
@@ -94,9 +102,10 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, data)
       .pipe(
         tap(res => {
-          console.log('Login response:', res);
-          console.log('User roles:', res.user.roles);
-          console.log('Primary role:', res.user.role);
+          console.log('✅ Login response:', res);
+          console.log('👤 User roles:', res.user.roles);
+          console.log('🎭 Primary role:', res.user.role);
+          console.log('🔑 Token received:', res.token ? 'Yes' : 'No');
           this.setAuthData(res.token, res.user);
         }),
         catchError(err => this.handleError(err))

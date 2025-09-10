@@ -15,6 +15,14 @@ const {
   duplicateJobOffer
 } = require("../controllers/joboffer");
 
+// Middleware de logging pour debug
+router.use((req, res, next) => {
+  console.log(`🛣️  JobOffer route: ${req.method} ${req.path}`);
+  console.log('🔑 Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
+  console.log('👤 User in request:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+  next();
+});
+
 // Routes publiques (pour les candidats)
 router.get("/public", findAllJobOffers); // Offres publiées seulement
 router.get("/public/:id", findJobOfferById);

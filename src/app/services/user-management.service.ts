@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import { 
   UserManagement, 
   Role, 
@@ -17,9 +18,6 @@ import { environment } from '../../environments/environment';
   providedIn: 'root'
 })
 export class UserManagementService {
-  resetPassword(id: number) {
-    throw new Error('Method not implemented.');
-  }
   private apiUrl = `${environment.backendUrl}/admin`;
 
   constructor(private http: HttpClient) { }
@@ -34,7 +32,9 @@ export class UserManagementService {
     if (role) params = params.set('role', role);
     if (isActive !== undefined) params = params.set('isActive', isActive.toString());
 
-    return this.http.get<UsersResponse>(`${this.apiUrl}/users`, { params });
+    return this.http.get<UsersResponse>(`${this.apiUrl}/users`, { params }).pipe(
+      tap(response => console.log('Users API response:', response))
+    );
   }
 
   getUserById(id: number): Observable<{ user: UserManagement }> {
@@ -64,7 +64,9 @@ export class UserManagementService {
 
   // Gestion des rôles
   getRoles(): Observable<RolesResponse> {
-    return this.http.get<RolesResponse>(`${this.apiUrl}/roles`);
+    return this.http.get<RolesResponse>(`${this.apiUrl}/roles`).pipe(
+      tap(response => console.log('Roles API response:', response))
+    );
   }
 
   assignRole(assignData: AssignRoleRequest): Observable<{ message: string }> {

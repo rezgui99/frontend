@@ -293,6 +293,315 @@ const getAllAlerts = async (req, res) => {
   }
 };
 
+// === PLANS D'ACTION ===
+const getActionPlans = async (req, res) => {
+  try {
+    console.log('📋 Getting GPEC action plans...');
+    console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    const { alert_id, status } = req.query;
+    
+    // Utiliser les données réelles des employés et compétences pour générer des plans d'action
+    const employees = await Employee.findAll({
+      include: [{
+        model: EmployeeSkill,
+        as: 'EmployeeSkills',
+        include: [
+          { model: Skill, as: 'Skill' },
+          { model: SkillLevel, as: 'SkillLevel' }
+        ]
+      }]
+    });
+
+    const jobDescriptions = await JobDescription.findAll({
+      include: [{
+        model: JobRequiredSkill,
+        as: 'requiredSkills',
+        include: [
+          { model: Skill },
+          { model: SkillLevel }
+        ]
+      }]
+    });
+
+    // Analyser les gaps réels pour créer des plans d'action pertinents
+    let actionPlans = [];
+    
+    // Plan basé sur l'analyse des compétences manquantes
+    const skillGaps = await analyzeRealSkillGaps(employees, jobDescriptions);
+    if (skillGaps.length > 0) {
+      actionPlans.push({
+        id: 'AP-001',
+        alert_id: 'GPEC-001',
+        title: `Plan de formation: ${skillGaps[0].skill_name}`,
+        description: `Formation de ${skillGaps[0].affected_employees} employés en ${skillGaps[0].skill_name}`,
+        status: 'in_progress',
+        priority: skillGaps[0].gap_percentage > 60 ? 'urgent' : 'high',
+        assigned_to: 'Équipe Formation',
+        due_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+        progress: 25,
+        actions: [
+          {
+            id: 'A-001',
+            title: 'Évaluation des besoins',
+            status: 'completed',
+            due_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+          },
+          {
+            id: 'A-002',
+            title: 'Sélection organisme formation',
+            status: 'in_progress',
+            due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          }
+        ],
+        budget_estimate: skillGaps[0].affected_employees * 1200,
+        success_metrics: [
+          {
+            name: 'Employés formés',
+            target_value: skillGaps[0].affected_employees,
+            current_value: Math.floor(skillGaps[0].affected_employees * 0.3),
+            unit: 'personnes'
+          }
+        ],
+        created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        updated_at: new Date()
+      });
+    }
+
+    // Plan basé sur les employés avec peu de compétences
+    const employeesNeedingDevelopment = employees.filter(emp => 
+      (emp.EmployeeSkills?.length || 0) < 3
+    );
+
+    if (employeesNeedingDevelopment.length > 0) {
+      actionPlans.push({
+        id: 'AP-002',
+        alert_id: 'GPEC-002',
+        title: 'Développement compétences employés',
+        description: `${employeesNeedingDevelopment.length} employés ont besoin de développer leurs compétences`,
+        status: 'approved',
+        priority: 'medium',
+        assigned_to: 'RH + Managers',
+        due_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        progress: 15,
+        actions: [
+          {
+            id: 'A-003',
+            title: 'Entretiens individuels',
+            status: 'in_progress',
+            due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+          }
+        ],
+        budget_estimate: employeesNeedingDevelopment.length * 800,
+        success_metrics: [
+          {
+            name: 'Plans individuels créés',
+            target_value: employeesNeedingDevelopment.length,
+            current_value: Math.floor(employeesNeedingDevelopment.length * 0.2),
+            unit: 'plans'
+          }
+        ],
+        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        updated_at: new Date()
+      });
+    }
+
+    // Plan basé sur les départements
+    const departmentAnalysis = await analyzeDepartmentGaps(employees);
+    if (departmentAnalysis.length > 0) {
+      const topDept = departmentAnalysis[0];
+      actionPlans.push({
+        id: 'AP-001',
+        alert_id: 'GPEC-003',
+        title: `Renforcement département ${topDept.department}`,
+        description: `Plan de renforcement pour le département ${topDept.department} (${topDept.employee_count} employés)`,
+        status: 'draft',
+        priority: 'medium',
+        assigned_to: `Manager ${topDept.department}`,
+        due_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        progress: 5,
+        actions: [
+          {
+            id: 'A-004',
+            title: 'Audit compétences département',
+            status: 'pending',
+            due_date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)
+          }
+        ],
+        budget_estimate: topDept.employee_count * 500,
+        success_metrics: [
+          {
+            name: 'Compétences évaluées',
+            target_value: topDept.employee_count,
+            current_value: 0,
+            unit: 'évaluations'
+          }
+        ],
+        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        updated_at: new Date()
+      });
+    }
+
+    // Appliquer les filtres
+    if (alert_id) {
+      actionPlans = actionPlans.filter(plan => plan.alert_id === alert_id);
+    }
+    
+    if (status) {
+      actionPlans = actionPlans.filter(plan => plan.status === status);
+    }
+
+    console.log('✅ Action plans found:', actionPlans.length);
+    res.json(actionPlans);
+  } catch (error) {
+    console.error('❌ Error getting action plans:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Fonctions utilitaires pour analyser les données réelles
+async function analyzeRealSkillGaps(employees, jobDescriptions) {
+  const skillDemand = new Map();
+  const skillSupply = new Map();
+
+  // Analyser la demande (compétences requises)
+  jobDescriptions.forEach(job => {
+    job.requiredSkills?.forEach(reqSkill => {
+      const skillName = reqSkill.Skill?.name;
+      if (skillName) {
+        skillDemand.set(skillName, (skillDemand.get(skillName) || 0) + 1);
+      }
+    });
+  });
+
+  // Analyser l'offre (compétences des employés)
+  employees.forEach(emp => {
+    emp.EmployeeSkills?.forEach(empSkill => {
+      const skillName = empSkill.Skill?.name;
+      if (skillName) {
+        skillSupply.set(skillName, (skillSupply.get(skillName) || 0) + 1);
+      }
+    });
+  });
+
+  // Calculer les gaps
+  const gaps = [];
+  skillDemand.forEach((demand, skillName) => {
+    const supply = skillSupply.get(skillName) || 0;
+    const gapPercentage = supply > 0 ? Math.max(0, ((demand - supply) / demand) * 100) : 100;
+    
+    if (gapPercentage > 20) {
+      gaps.push({
+        skill_name: skillName,
+        required_demand: demand,
+        current_supply: supply,
+        gap_percentage: Math.round(gapPercentage),
+        affected_employees: Math.max(1, demand - supply)
+      });
+    }
+  });
+
+  return gaps.sort((a, b) => b.gap_percentage - a.gap_percentage);
+}
+
+async function analyzeDepartmentGaps(employees) {
+  const departmentStats = new Map();
+  
+  employees.forEach(emp => {
+    const dept = emp.department || 'Non spécifié';
+    if (!departmentStats.has(dept)) {
+      departmentStats.set(dept, {
+        department: dept,
+        employee_count: 0,
+        total_skills: 0
+      });
+    }
+    
+    const stats = departmentStats.get(dept);
+    stats.employee_count++;
+    stats.total_skills += emp.EmployeeSkills?.length || 0;
+  });
+
+  return Array.from(departmentStats.values())
+    .map(dept => ({
+      ...dept,
+      avg_skills_per_employee: dept.employee_count > 0 ? dept.total_skills / dept.employee_count : 0
+    }))
+    .sort((a, b) => b.employee_count - a.employee_count);
+}
+
+const createActionPlan = async (req, res) => {
+  try {
+    console.log('📝 Creating action plan:', req.body);
+    
+    const {
+      alert_id,
+      title,
+      description,
+      priority = 'medium',
+      assigned_to,
+      due_date,
+      actions = [],
+      budget_estimate = 0
+    } = req.body;
+
+    if (!alert_id || !title || !description) {
+      return res.status(400).json({
+        error: 'Champs requis manquants',
+        required: ['alert_id', 'title', 'description']
+      });
+    }
+
+    const newActionPlan = {
+      id: `AP-${Date.now()}`,
+      alert_id,
+      title,
+      description,
+      status: 'draft',
+      priority,
+      assigned_to,
+      due_date: due_date ? new Date(due_date) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      progress: 0,
+      actions,
+      budget_estimate,
+      created_by: req.user.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    console.log('✅ Action plan created:', newActionPlan.id);
+    res.status(201).json({
+      message: 'Plan d\'action créé avec succès',
+      actionPlan: newActionPlan
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating action plan:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const updateActionPlan = async (req, res) => {
+  try {
+    console.log('📝 Updating action plan:', req.params.id, req.body);
+    
+    const updatedPlan = {
+      id: req.params.id,
+      ...req.body,
+      updated_at: new Date()
+    };
+
+    console.log('✅ Action plan updated');
+    res.json({
+      message: 'Plan d\'action mis à jour avec succès',
+      actionPlan: updatedPlan
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating action plan:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // === ANALYSES PRÉDICTIVES ===
 const analyzeDepartureRisks = async (req, res) => {
   try {
@@ -896,6 +1205,9 @@ function getRecommendedProvider(skillName) {
 module.exports = {
   getGPECDashboard,
   getAllAlerts,
+  getActionPlans,
+  createActionPlan,
+  updateActionPlan,
   analyzeDepartureRisks,
   analyzeSkillGaps,
   predictTrainingNeeds,

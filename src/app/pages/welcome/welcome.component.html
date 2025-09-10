@@ -8,17 +8,13 @@
           <h1 class="text-2xl font-bold text-gray-900">SmartHire</h1>
         </div>
         <div class="flex items-center space-x-4">
-          <a *ngIf="!isRecruiterAuthenticated" routerLink="/auth/login" 
+          <a routerLink="/login-selector" 
              class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-            Espace Recruteur
+            Se connecter
           </a>
           <a *ngIf="isRecruiterAuthenticated" routerLink="/home" 
              class="text-blue-600 hover:text-blue-800 px-3 py-2 rounded-md text-sm font-medium transition-colors">
             Dashboard RH
-          </a>
-          <a *ngIf="!isCandidateAuthenticated" routerLink="/candidate/login" 
-             class="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
-            Espace Candidat
           </a>
           <a *ngIf="isCandidateAuthenticated" routerLink="/candidate/dashboard" 
              class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -45,13 +41,13 @@
         </p>
         
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
-          <a routerLink="/auth/login" 
+          <a routerLink="/login-selector" 
              class="bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 rounded-lg text-lg font-medium transition-colors duration-200 shadow-lg hover:shadow-xl">
-            🏢 Accès Recruteur
+            🚀 Accéder à la plateforme
           </a>
-          <a routerLink="/candidate/login" 
+          <a routerLink="/welcome" 
              class="bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50 px-8 py-3 rounded-lg text-lg font-medium transition-colors duration-200">
-            👤 Accès Candidat
+            📖 En savoir plus
           </a>
         </div>
       </div>
@@ -106,7 +102,7 @@
             </div>
           </div>
 
-          <a routerLink="/auth/login" 
+          <a routerLink="/login-selector" 
              class="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 rounded-lg font-medium transition-colors duration-200 block text-center">
             Se connecter comme Recruteur
           </a>
@@ -151,7 +147,7 @@
             </div>
           </div>
 
-          <a routerLink="/candidate/login" 
+          <a routerLink="/login-selector" 
              class="w-full bg-green-600 text-white hover:bg-green-700 px-6 py-3 rounded-lg font-medium transition-colors duration-200 block text-center">
             Se connecter comme Candidat
           </a>
@@ -200,11 +196,8 @@
           Plateforme intelligente de gestion RH et matching de compétences
         </p>
         <div class="flex justify-center space-x-6">
-          <a routerLink="/auth/login" class="text-gray-400 hover:text-white transition-colors">
-            Recruteurs
-          </a>
-          <a routerLink="/candidate/login" class="text-gray-400 hover:text-white transition-colors">
-            Candidats
+          <a routerLink="/login-selector" class="text-gray-400 hover:text-white transition-colors">
+            Se connecter
           </a>
         </div>
         <div class="mt-8 pt-8 border-t border-gray-800 text-sm text-gray-500">

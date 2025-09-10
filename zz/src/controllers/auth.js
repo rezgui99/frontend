@@ -191,6 +191,7 @@ const login = async (req, res) => {
       include: [{
         model: db.Role,
         as: 'roles',
+        where: { is_active: true },
         required: false,
         through: { attributes: [] }
       }]
@@ -200,6 +201,9 @@ const login = async (req, res) => {
     const userRoles = userWithRoles?.roles?.filter(role => role.is_active)?.map(role => role.name) || [];
     const primaryRole = userRoles.includes('admin') ? 'admin' : userRoles.includes('hr') ? 'hr' : 'user';
     
+    console.log('🔑 Login - User roles found:', userRoles);
+    console.log('🎭 Login - Primary role assigned:', primaryRole);
+    
     const userResponse = {
       ...user.toJSON(),
       role: primaryRole,
@@ -207,6 +211,14 @@ const login = async (req, res) => {
     };
     
     const token = generateToken(user.id);
+
+    console.log('✅ Login successful - Token generated for user:', user.username);
+    console.log('📋 Login - Final user response:', {
+      id: userResponse.id,
+      username: userResponse.username,
+      role: userResponse.role,
+      roles: userResponse.roles
+    });
 
     res.json({ message: 'Connexion réussie', user: userResponse, token });
   } catch (error) {

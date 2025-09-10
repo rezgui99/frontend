@@ -16,6 +16,13 @@ const {
   adminResetPassword
 } = require('../controllers/userManagement');
 
+// Middleware de logging pour debug
+router.use((req, res, next) => {
+  console.log(`🛣️  UserManagement route: ${req.method} ${req.path}`);
+  console.log('🔑 Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
+  next();
+});
+
 // Toutes les routes nécessitent une authentification
 router.use(authenticateToken);
 

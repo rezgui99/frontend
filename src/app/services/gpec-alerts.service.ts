@@ -196,12 +196,15 @@ export class GPECAlertsService {
   }
 
   getActionPlans(alertId?: string): Observable<ActionPlan[]> {
-    let url = `${this.apiUrl}/action-plans`;
+    let params = new HttpParams();
     if (alertId) {
-      url += `?alert_id=${alertId}`;
+      params = params.set('alert_id', alertId);
     }
 
-    return this.http.get<ActionPlan[]>(url).pipe(
+    console.log('🔍 GPECService - Getting action plans from:', `${this.apiUrl}/action-plans`);
+    console.log('🔍 GPECService - With params:', params.toString());
+
+    return this.http.get<ActionPlan[]>(`${this.apiUrl}/action-plans`, { params }).pipe(
       catchError(error => {
         console.error('Erreur chargement plans d\'action:', error);
         throw error;
@@ -209,11 +212,10 @@ export class GPECAlertsService {
     );
   }
 
+ 
+
   updateActionPlan(planId: string, updates: Partial<ActionPlan>): Observable<ActionPlan> {
-    return this.http.put<ActionPlan>(`${this.apiUrl}/action-plans/${planId}`, {
-      ...updates,
-      updated_at: new Date()
-    }).pipe(
+    return this.http.put<ActionPlan>(`${this.apiUrl}/action-plans/${planId}`, updates).pipe(
       catchError(error => {
         console.error('Erreur mise à jour plan d\'action:', error);
         throw error;

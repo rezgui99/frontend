@@ -19,13 +19,17 @@ import { AdvancedAnalyticsComponent } from './pages/advanced-analytics/advanced-
 import { JobOffersListComponent } from './pages/job-offers-list/job-offers-list.component';
 import { GPECAlertsComponent } from './pages/gpec-alerts/gpec-alerts.component';
 import { WelcomeComponent } from './pages/welcome/welcome.component';
+import { LoginSelectorComponent } from './components/login-selector/login-selector.component';
 import { CandidateAuthGuard } from './guards/candidate-auth.guard';
 import { CandidateGuestGuard } from './guards/candidate-guest.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/welcome', pathMatch: 'full' },
+  { path: '', redirectTo: '/login-selector', pathMatch: 'full' },
   
-  // Page d'accueil publique
+  // Page de sélection du type de connexion
+  { path: 'login-selector', component: LoginSelectorComponent },
+  
+  // Page d'accueil publique (informations sur la plateforme)
   { path: 'welcome', component: WelcomeComponent },
   
   // Auth routes (accessible only to guests)
@@ -97,8 +101,16 @@ export const routes: Routes = [
     canActivate: [CandidateAuthGuard] 
   },
   
+  // Routes entretiens
+  { 
+    path: 'recruiter/interviews', 
+    loadComponent: () => import('./pages/recruiter/interviews/recruiter-interviews.component').then(m => m.RecruiterInterviewsComponent),
+    canActivate: [AuthGuard],
+    data: { roles: ['admin', 'hr'] }
+  },
+  
   // Unauthorized page
   { path: 'unauthorized', loadComponent: () => import('./pages/unauthorized/unauthorized.component').then(m => m.UnauthorizedComponent) },
   
-  { path: '**', redirectTo: '/home' }
+  { path: '**', redirectTo: '/login-selector' }
 ];

@@ -22,7 +22,7 @@ export class AppComponent {
       .subscribe((event: any) => {
         // Masquer la sidebar sur certaines routes
         const authPages = [
-          '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password',
+          '/login-selector', '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password',
           '/welcome', '/candidate/login', '/candidate/register', '/candidate/dashboard',
           '/candidate/job-offers', '/candidate/apply', '/candidate/applications', 
           '/candidate/cvs', '/candidate/favorites'

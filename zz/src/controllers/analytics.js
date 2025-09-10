@@ -16,6 +16,10 @@ const {
 // Tableau de bord complet avec toutes les métriques
 const getAdvancedDashboard = async (req, res) => {
   try {
+    console.log('📊 Getting advanced dashboard...');
+    console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    console.log('🔍 Query filters:', req.query);
+    
     const { date_from, date_to, department, contract_type } = req.query;
     
     // Construction des filtres

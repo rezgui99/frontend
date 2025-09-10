@@ -37,6 +37,8 @@ const candidateFavoritesRoutes = require("./src/routes/candidateFavorites");
 const publicJobOffersRoutes = require("./src/routes/publicJobOffers");
 const recruiterApplicationsRoutes = require("./src/routes/recruiterApplications");
 
+// Routes entretiens
+const interviewRoutes = require("./src/routes/interviews");
 
 
 
@@ -79,6 +81,9 @@ app.use("/api/candidate/applications", candidateApplicationRoutes);
 app.use("/api/candidate/favorites", candidateFavoritesRoutes);
 app.use("/api/public/job-offers", publicJobOffersRoutes);
 app.use("/api/recruiter/applications", recruiterApplicationsRoutes);
+
+// Routes entretiens
+app.use("/api/interviews", interviewRoutes);
 
 // 404 - Route non trouvée
 app.use((req, res, next) => {
