@@ -377,7 +377,6 @@ const findAvailableInterviewer = async (interviewDate, transaction) => {
 const generateMeetingLink = () => {
   // Générer un lien Google Meet valide
   const characters = 'abcdefghijklmnopqrstuvwxyz';
-  const numbers = '0123456789';
   
   // Format Google Meet: https://meet.google.com/xxx-xxxx-xxx
   const part1 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
@@ -444,7 +443,7 @@ const sendInterviewNotificationToCandidate = async (application, interview) => {
               <li style="margin: 10px 0;"><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</li>
               <li style="margin: 10px 0;"><strong>⏱️ Durée :</strong> ${interview.duration_minutes} minutes</li>
               <li style="margin: 10px 0;"><strong>🎯 Type :</strong> ${getInterviewTypeLabel(interview.interview_type)}</li>
-              <li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${interview.meeting_link}" style="color: #2196F3;">${interview.meeting_link}</a></li>
+              <li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${interview.meeting_link}" style="color: #2196F3; font-weight: bold; text-decoration: none;">${interview.meeting_link}</a></li>
               <li style="margin: 10px 0;"><strong>📍 Poste :</strong> ${jobOffer.title}</li>
               <li style="margin: 10px 0;"><strong>🏢 Entreprise :</strong> ${jobOffer.company}</li>
             </ul>
@@ -464,8 +463,7 @@ const sendInterviewNotificationToCandidate = async (application, interview) => {
           <div style="text-align: center; margin: 30px 0;">
             <p style="color: #10b981; font-weight: bold;">🍀 Bonne chance pour votre entretien !</p>
             <p style="color: #6b7280; font-size: 12px;">
-              Cet entretien a été automatiquement programmé. Si vous avez des questions ou besoin de reporter, 
-              contactez notre équipe RH.
+              Si vous avez des questions ou besoin de reporter, contactez notre équipe RH.
             </p>
           </div>
         </div>
@@ -614,6 +612,12 @@ const withdrawApplication = async (req, res) => {
         id: req.params.id,
         candidate_id: req.candidate.id
       },
+      include: [
+        {
+          model: JobOffer,
+          as: 'jobOffer'
+        }
+      ],
       transaction: t
     });
 
@@ -630,27 +634,78 @@ const withdrawApplication = async (req, res) => {
       });
     }
 
-    // Annuler l'entretien associé s'il existe
+    // Gérer l'entretien associé s'il existe
     const associatedInterview = await Interview.findOne({
       where: { application_id: application.id },
+      include: [
+        {
+          model: User,
+          as: 'interviewer',
+          attributes: ['id', 'firstName', 'lastName', 'email']
+        }
+      ],
       transaction: t
     });
 
-    if (associatedInterview && ['scheduled', 'confirmed'].includes(associatedInterview.status)) {
-      await associatedInterview.update({
-        status: 'cancelled',
-        notes: `${associatedInterview.notes || ''}\n\nAnnulé automatiquement suite au retrait de candidature le ${new Date().toLocaleString('fr-FR')}`
-      }, { transaction: t });
+    if (associatedInterview) {
+      // Envoyer emails d'annulation AVANT de supprimer
+      try {
+        const candidate = await Candidate.findByPk(application.candidate_id);
+        
+        if (candidate) {
+          // Email au candidat
+          await transporter.sendMail({
+            from: process.env.FROM_EMAIL,
+            to: candidate.email,
+            subject: `Entretien annulé suite au retrait de candidature - ${application.jobOffer.title}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #ef4444;">Entretien Annulé</h1>
+                <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p>Bonjour ${candidate.firstName} ${candidate.lastName},</p>
+                  <p>Suite au retrait de votre candidature pour le poste de <strong>${application.jobOffer.title}</strong>, l'entretien prévu le <strong>${new Date(associatedInterview.scheduled_date).toLocaleString('fr-FR')}</strong> a été automatiquement annulé.</p>
+                  <p>Nous espérons avoir l'occasion de collaborer avec vous à l'avenir sur d'autres opportunités.</p>
+                  <p>Cordialement,<br>L'équipe de recrutement</p>
+                </div>
+              </div>
+            `
+          });
 
-      console.log('✅ Associated interview cancelled:', associatedInterview.id);
+          // Email au recruteur
+          if (associatedInterview.interviewer) {
+            await transporter.sendMail({
+              from: process.env.FROM_EMAIL,
+              to: associatedInterview.interviewer.email,
+              subject: `Entretien annulé - Candidature retirée - ${application.jobOffer.title}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1 style="color: #ef4444;">Entretien Annulé</h1>
+                  <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p>Bonjour ${associatedInterview.interviewer.firstName},</p>
+                    <p>L'entretien prévu le <strong>${new Date(associatedInterview.scheduled_date).toLocaleString('fr-FR')}</strong> avec <strong>${candidate.firstName} ${candidate.lastName}</strong> pour le poste de <strong>${application.jobOffer.title}</strong> a été annulé.</p>
+                    <p><strong>Raison :</strong> Le candidat a retiré sa candidature.</p>
+                    <p>Votre créneau est maintenant libre.</p>
+                  </div>
+                </div>
+              `
+            });
+          }
+        }
+      } catch (emailError) {
+        console.error('Erreur envoi email annulation entretien:', emailError);
+      }
+
+      // SUPPRIMER l'entretien au lieu de le mettre à jour
+      await associatedInterview.destroy({ transaction: t });
+      console.log('✅ Associated interview deleted due to application withdrawal:', associatedInterview.id);
     }
 
+    // Maintenant supprimer la candidature (plus de contrainte de clé étrangère)
     await application.destroy({ transaction: t });
 
     // Décrémenter le compteur de candidatures
-    const jobOffer = await JobOffer.findByPk(application.job_offer_id, { transaction: t });
-    if (jobOffer && jobOffer.applications_count > 0) {
-      await jobOffer.decrement('applications_count', { transaction: t });
+    if (application.jobOffer && application.jobOffer.applications_count > 0) {
+      await application.jobOffer.decrement('applications_count', { transaction: t });
     }
 
     await t.commit();
@@ -863,6 +918,44 @@ const downloadCV = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+// Fonction pour envoyer email de notification au recruteur
+const sendInterviewNotificationToRecruiter = async (application, interview, interviewer) => {
+  try {
+    const candidate = await Candidate.findByPk(application.candidate_id);
+    const jobOffer = await JobOffer.findByPk(application.job_offer_id);
+    
+    if (!candidate || !jobOffer || !interviewer) return;
+    
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: interviewer.email,
+      subject: `Nouvel entretien programmé - ${jobOffer.title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #2196F3;">Nouvel entretien programmé</h1>
+          <p>Bonjour ${interviewer.firstName} ${interviewer.lastName},</p>
+          
+          <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3>Détails de l'entretien :</h3>
+            <ul>
+              <li><strong>Candidat :</strong> ${candidate.firstName} ${candidate.lastName}</li>
+              <li><strong>Email :</strong> ${candidate.email}</li>
+              <li><strong>Poste :</strong> ${jobOffer.title}</li>
+              <li><strong>Date :</strong> ${new Date(interview.scheduled_date).toLocaleString('fr-FR')}</li>
+              <li><strong>Lien Meet :</strong> <a href="${interview.meeting_link}">${interview.meeting_link}</a></li>
+            </ul>
+          </div>
+          
+          <p>L'entretien a été automatiquement créé suite à la candidature.</p>
+        </div>
+      `
+    });
+    
+    console.log('✅ Interview notification email sent to recruiter');
+  } catch (emailError) {
+    console.error('❌ Error sending recruiter notification:', emailError);
+  }
+};
 
 module.exports = {
   applyToJobOffer,
@@ -878,5 +971,6 @@ module.exports = {
   // Exporter les nouvelles fonctions pour utilisation dans d'autres modules
   createAutomaticInterview,
   findAvailableInterviewer,
-  generateMeetingLink
+  generateMeetingLink,
+  sendInterviewNotificationToRecruiter
 };

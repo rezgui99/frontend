@@ -87,6 +87,20 @@ getInitials(name: string): string {
   if (!name || name === 'Poste vacant') return '?';
   return name.charAt(0).toUpperCase();
 }
+
+  // Méthode pour gérer les erreurs d'image
+  onImageError(event: any, employeeName: string): void {
+    console.warn(`Erreur de chargement d'image pour ${employeeName}`);
+    event.target.style.display = 'none';
+    // Forcer l'affichage des initiales
+    const parentElement = event.target.parentElement;
+    if (parentElement) {
+      const spanElement = parentElement.querySelector('span');
+      if (spanElement) {
+        spanElement.style.display = 'block';
+      }
+    }
+  }
   buildOrgChart(): void {
     // Créer une map des fiches de poste avec leurs relations hiérarchiques
     const jobMap = new Map<number, JobDescription>();

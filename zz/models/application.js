@@ -95,6 +95,19 @@ module.exports = (sequelize, DataTypes) => {
               transaction: options.transaction
             });
           }
+        },
+
+        afterDestroy: async (application, options) => {
+          // Décrémenter le compteur de candidatures de l'offre
+          const jobOffer = await sequelize.models.JobOffer.findByPk(application.job_offer_id, {
+            transaction: options.transaction
+          });
+          
+          if (jobOffer && jobOffer.applications_count > 0) {
+            await jobOffer.decrement('applications_count', {
+              transaction: options.transaction
+            });
+          }
         }
       }
     }

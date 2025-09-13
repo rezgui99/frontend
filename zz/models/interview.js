@@ -103,47 +103,8 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "Interview",
       tableName: "Interviews",
       hooks: {
-        afterCreate: async (interview, options) => {
-          // Mettre à jour le statut de la candidature
-          const application = await sequelize.models.Application.findByPk(interview.application_id, {
-            transaction: options.transaction
-          });
-          
-          if (application && application.status === 'under_review') {
-            await application.update({
-              status: 'interview_scheduled',
-              confirmed_interview_date: interview.scheduled_date,
-              interview_link: interview.meeting_link
-            }, {
-              transaction: options.transaction
-            });
-          }
-        },
-        
-        afterUpdate: async (interview, options) => {
-          // Mettre à jour le statut de la candidature selon le statut de l'entretien
-          if (interview.changed('status')) {
-            const application = await sequelize.models.Application.findByPk(interview.application_id, {
-              transaction: options.transaction
-            });
-            
-            if (application) {
-              let newStatus = application.status;
-              
-              if (interview.status === 'completed') {
-                newStatus = 'interview_completed';
-              } else if (interview.status === 'cancelled') {
-                newStatus = 'under_review';
-              }
-              
-              if (newStatus !== application.status) {
-                await application.update({ status: newStatus }, {
-                  transaction: options.transaction
-                });
-              }
-            }
-          }
-        }
+        // Hooks supprimés - la logique est maintenant dans les contrôleurs
+        // pour un meilleur contrôle et éviter les effets de bord
       }
     }
   );

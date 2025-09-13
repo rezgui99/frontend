@@ -7,13 +7,13 @@ const {
   getAllInterviews,
   getInterviewStatistics,
   getUpcomingInterviews,
-  getInterviewTypeLabels,
   scheduleInterview,
   updateInterview,
   cancelInterview,
   completeInterview,
   rescheduleInterview,
-  sendInterviewConfirmationEmail
+  confirmInterview,            
+  sendInterviewConfirmation 
 } = require('../controllers/interviews');
 
 // Middleware de logging pour debug
@@ -32,14 +32,27 @@ router.use(requireAdminOrHR);
 router.get('/', getAllInterviews);
 router.get('/statistics', getInterviewStatistics);
 router.get('/upcoming', getUpcomingInterviews);
-router.get('/interview-types', getInterviewTypeLabels);
+
+// Route pour obtenir les types d'entretien
+router.get('/interview-types', (req, res) => {
+  res.json({
+    phone: 'Entretien téléphonique',
+    video: 'Entretien vidéo',
+    in_person: 'Entretien en personne',
+    technical: 'Entretien technique',
+    hr: 'Entretien RH',
+    final: 'Entretien final'
+  });
+});
 
 router.post('/', auditAction('CREATE', 'Interviews'), scheduleInterview);
 router.put('/:id', auditAction('UPDATE', 'Interviews'), updateInterview);
+router.patch('/:id/confirm', auditAction('UPDATE', 'Interviews'), confirmInterview);
 router.patch('/:id/complete', auditAction('UPDATE', 'Interviews'), completeInterview);
 router.patch('/:id/reschedule', auditAction('UPDATE', 'Interviews'), rescheduleInterview);
 router.patch('/:id/cancel', auditAction('UPDATE', 'Interviews'), cancelInterview);
 
-router.post('/:id/send-confirmation', auditAction('NOTIFY', 'Interviews'), sendInterviewConfirmationEmail);
+// Route pour envoyer une confirmation manuelle
+router.post('/:id/send-confirmation', auditAction('NOTIFY', 'Interviews'), sendInterviewConfirmation);
 
 module.exports = router;

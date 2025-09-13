@@ -62,6 +62,46 @@
   background: linear-gradient(135deg, #f8fafc, #e2e8f0);
 }
 
+/* Document section styling */
+.documents-section {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  border: 1px solid #cbd5e1;
+}
+
+.document-item {
+  transition: all 0.2s ease;
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+
+.document-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-color: #3b82f6;
+}
+
+/* CV download button */
+.cv-download-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  transition: all 0.2s ease;
+}
+
+.cv-download-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Cover letter modal */
+.cover-letter-modal {
+  backdrop-filter: blur(4px);
+}
+
+.cover-letter-content {
+  font-family: 'Georgia', serif;
+  line-height: 1.7;
+  color: #374151;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .interview-card {

@@ -66,6 +66,12 @@ export class RecruiterApplicationsComponent implements OnInit {
   showScheduleInterviewModal = false;
   selectedApplication: Application | null = null;
   scheduleForm: FormGroup;
+  
+  // Nouveaux modals
+  showCoverLetterModal = false;
+  showApplicationDetailsModal = false;
+  selectedApplicationForCoverLetter: Application | null = null;
+  selectedApplicationDetails: Application | null = null;
 
   constructor(
     private recruiterService: RecruiterApplicationsService,
@@ -324,8 +330,52 @@ export class RecruiterApplicationsComponent implements OnInit {
   }
 
   downloadCV(cvId: number): void {
-    // Implementation would require a service method to download CV by ID
-    console.log('Download CV:', cvId);
+    // Télécharger le CV via l'API recruteur
+    window.open(`http://localhost:3000/api/recruiter/applications/cv/${cvId}/download`, '_blank');
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  showFullCoverLetter(application: Application): void {
+    this.selectedApplicationForCoverLetter = application;
+    this.showCoverLetterModal = true;
+  }
+
+  closeCoverLetterModal(): void {
+    this.showCoverLetterModal = false;
+    this.selectedApplicationForCoverLetter = null;
+  }
+
+  viewApplicationDetails(application: Application): void {
+    // Charger les détails complets de la candidature
+    this.recruiterService.getApplicationDetails(application.id!).subscribe({
+      next: (details) => {
+        this.selectedApplicationDetails = details;
+        this.showApplicationDetailsModal = true;
+      },
+      error: (error) => {
+        console.error('Error loading application details:', error);
+      }
+    });
+  }
+
+  closeApplicationDetailsModal(): void {
+    this.showApplicationDetailsModal = false;
+    this.selectedApplicationDetails = null;
+  }
+
+  quickScheduleInterview(application: Application, slot: string): void {
+    this.selectedApplication = application;
+    this.showScheduleInterviewModal = true;
+    this.scheduleForm.patchValue({
+      confirmed_interview_date: new Date(slot).toISOString().slice(0, 16)
+    });
   }
 
   showNotesModal(application: Application): void {

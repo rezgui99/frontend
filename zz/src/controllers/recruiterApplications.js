@@ -304,60 +304,137 @@ const scheduleInterview = async (req, res) => {
     }
 
     // Générer un lien Google Meet si pas fourni
-    let meetLink = interview_link;
-    if (!meetLink) {
-      meetLink = generateGoogleMeetLink();
+    const meetLink = interview_link || generateGoogleMeetLink();
+
+    // Chercher un entretien existant pour cette candidature
+    let interview = await Interview.findOne({
+      where: { application_id: application.id },
+      transaction: t
+    });
+
+    if (interview) {
+      // Mettre à jour l'entretien existant
+      await interview.update({
+        scheduled_date: interviewDate,
+        meeting_link: meetLink,
+        status: 'confirmed',
+        notes: recruiter_notes ? `${interview.notes || ''}\n\n[MISE À JOUR] ${recruiter_notes}` : interview.notes,
+        interviewer_id: req.user.id
+      }, { transaction: t });
+    } else {
+      // Créer un nouvel entretien
+      interview = await Interview.create({
+        application_id: application.id,
+        interviewer_id: req.user.id,
+        scheduled_date: interviewDate,
+        duration_minutes: 60,
+        interview_type: 'video',
+        meeting_link: meetLink,
+        status: 'confirmed',
+        notes: recruiter_notes,
+        decision: 'pending',
+        reminder_sent: false
+      }, { transaction: t });
     }
 
+    // Mettre à jour l'application
     await application.update({
       status: 'interview_scheduled',
       confirmed_interview_date: interviewDate,
       interview_link: meetLink,
-      recruiter_notes
+      recruiter_notes: recruiter_notes ? `${application.recruiter_notes || ''}\n\n[ENTRETIEN] Programmé le ${new Date().toLocaleString('fr-FR')} - ${recruiter_notes}` : application.recruiter_notes
     }, { transaction: t });
 
-    // Envoyer email de confirmation au candidat
+    // Envoyer email de confirmation détaillé au candidat
     try {
       await transporter.sendMail({
         from: process.env.FROM_EMAIL,
         to: application.candidate.email,
-        subject: `Entretien confirmé - ${application.jobOffer.title}`,
+        subject: `✅ Entretien confirmé - ${application.jobOffer.title}`,
         html: `
-          <h1>Entretien confirmé !</h1>
-          <p>Bonjour ${application.candidate.firstName} ${application.candidate.lastName},</p>
-          
-          <p>Votre entretien pour le poste de <strong>${application.jobOffer.title}</strong> chez <strong>${application.jobOffer.company}</strong> a été confirmé.</p>
-          
-          <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3>Détails de l'entretien :</h3>
-            <p><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</p>
-            <p><strong>🔗 Lien de l'entretien :</strong> <a href="${meetLink}" style="color: #2196F3;">${meetLink}</a></p>
-            <p><strong>📍 Poste :</strong> ${application.jobOffer.title}</p>
-            <p><strong>🏢 Entreprise :</strong> ${application.jobOffer.company}</p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #10b981; text-align: center;">🎉 Entretien Confirmé !</h1>
+            
+            <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <h2>Félicitations ${application.candidate.firstName} ${application.candidate.lastName} !</h2>
+              <p>Votre candidature pour le poste de <strong>${application.jobOffer.title}</strong> chez <strong>${application.jobOffer.company}</strong> a retenu notre attention.</p>
+              <p>Nous avons confirmé votre entretien.</p>
+            </div>
+
+            <div style="background-color: #fff; border: 2px solid #10b981; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #10b981; margin-top: 0;">📅 Détails de l'entretien</h3>
+              <ul style="list-style: none; padding: 0;">
+                <li style="margin: 10px 0;"><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</li>
+                <li style="margin: 10px 0;"><strong>⏱️ Durée :</strong> ${interview.duration_minutes} minutes</li>
+                <li style="margin: 10px 0;"><strong>🎯 Type :</strong> Entretien vidéo</li>
+                <li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${meetLink}" style="color: #10b981; font-weight: bold; text-decoration: none;">${meetLink}</a></li>
+                <li style="margin: 10px 0;"><strong>📍 Poste :</strong> ${application.jobOffer.title}</li>
+                <li style="margin: 10px 0;"><strong>🏢 Entreprise :</strong> ${application.jobOffer.company}</li>
+              </ul>
+            </div>
+
+            <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
+              <ul style="color: #6b7280; font-size: 14px;">
+                <li>Testez votre connexion et votre matériel 15 minutes avant</li>
+                <li>Préparez vos questions sur l'entreprise et le poste</li>
+                <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
+                <li>Trouvez un endroit calme et bien éclairé</li>
+                <li>Préparez des exemples concrets de vos réalisations</li>
+              </ul>
+            </div>
+
+            ${recruiter_notes ? `
+              <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h4 style="color: #92400e; margin-top: 0;">📝 Notes du recruteur :</h4>
+                <p style="color: #78350f;">${recruiter_notes}</p>
+              </div>
+            ` : ''}
+
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="color: #10b981; font-weight: bold;">🍀 Nous avons hâte de vous rencontrer !</p>
+              <p style="color: #6b7280; font-size: 12px;">
+                Si vous avez des questions ou besoin de reporter, contactez notre équipe RH.
+              </p>
+            </div>
+              <li style="margin: 10px 0;"><strong>📍 Poste :</strong> ${application.jobOffer.title}</li>
+              <li style="margin: 10px 0;"><strong>🏢 Entreprise :</strong> ${application.jobOffer.company}</li>
+            </ul>
           </div>
           
-          <p><strong>Conseils pour l'entretien :</strong></p>
-          <ul>
-            <li>Testez votre connexion et votre matériel avant l'entretien</li>
-            <li>Préparez vos questions sur l'entreprise et le poste</li>
-            <li>Ayez votre CV sous les yeux</li>
-            <li>Trouvez un endroit calme pour l'entretien</li>
-          </ul>
+            <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
+              <ul style="color: #6b7280; font-size: 14px;">
+                <li>Testez votre connexion et votre matériel 15 minutes avant</li>
+                <li>Préparez vos questions sur l'entreprise et le poste</li>
+                <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
+                <li>Trouvez un endroit calme et bien éclairé</li>
+                <li>Préparez des exemples concrets de vos réalisations</li>
+              </ul>
+            </div>
           
           ${recruiter_notes ? `<p><strong>Notes du recruteur :</strong> ${recruiter_notes}</p>` : ''}
           
-          <p>Nous avons hâte de vous rencontrer !</p>
-          <p>Bonne chance !</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="color: #10b981; font-weight: bold;">🍀 Nous avons hâte de vous rencontrer !</p>
+              <p style="color: #6b7280; font-size: 12px;">
+                Si vous avez des questions ou besoin de reporter, contactez notre équipe RH.
+              </p>
+            </div>
+          </div>
         `
       });
+
+      console.log('✅ Interview confirmation email sent to candidate');
     } catch (emailError) {
       console.error('Erreur envoi email entretien:', emailError);
     }
 
-    await t.commit();
+      console.log('✅ Interview cancelled due to application withdrawal:', associatedInterview.id);
     res.json({
       message: 'Entretien programmé avec succès',
-      application
+      application,
+      interview
     });
 
   } catch (error) {
@@ -482,42 +559,54 @@ const bulkUpdateApplications = async (req, res) => {
     });
 
     // Envoyer des emails aux candidats concernés
-    for (const application of applications) {
-      try {
-        let emailSubject, emailContent;
+for (const application of applications) {
+  try {
+    let emailSubject, emailContent;
+    
+    switch (status) {
+      case 'rejected':
+        emailSubject = `Candidature - ${application.jobOffer.title}`;
+        emailContent = `
+          <p>Bonjour ${application.candidate.firstName},</p>
+          <p>Nous vous remercions pour votre candidature au poste de ${application.jobOffer.title}.</p>
+          <p>Après examen, nous avons décidé de ne pas donner suite à votre candidature pour ce poste.</p>
+          <p>Nous vous encourageons à consulter nos autres offres.</p>
+        `;
+        break;
         
-        switch (status) {
-          case 'rejected':
-            emailSubject = `Candidature - ${application.jobOffer.title}`;
-            emailContent = `
-              <p>Bonjour ${application.candidate.firstName},</p>
-              <p>Nous vous remercions pour votre candidature au poste de ${application.jobOffer.title}.</p>
-              <p>Après examen, nous avons décidé de ne pas donner suite à votre candidature pour ce poste.</p>
-              <p>Nous vous encourageons à consulter nos autres offres.</p>
-            `;
-            break;
-            
-          case 'under_review':
-            emailSubject = `Candidature en cours d'examen - ${application.jobOffer.title}`;
-            emailContent = `
-              <p>Bonjour ${application.candidate.firstName},</p>
-              <p>Votre candidature pour le poste de ${application.jobOffer.title} est en cours d'examen.</p>
-              <p>Nous vous contacterons prochainement.</p>
-            `;
-            break;
-        }
+      case 'under_review':
+        emailSubject = `Candidature en cours d'examen - ${application.jobOffer.title}`;
+        emailContent = `
+          <p>Bonjour ${application.candidate.firstName},</p>
+          <p>Votre candidature pour le poste de ${application.jobOffer.title} est en cours d'examen.</p>
+          <p>Nous vous contacterons prochainement.</p>
+        `;
+        break;
+    }
 
-        if (emailSubject && emailContent) {
-          await transporter.sendMail({
-            from: process.env.FROM_EMAIL,
-            to: application.candidate.email,
-            subject: emailSubject,
-            html: emailContent
-          });
-        }
-      } catch (emailError) {
-        console.error('Erreur envoi email bulk:', emailError);
-      }
+    if (emailSubject && emailContent) {
+      await transporter.sendMail({
+        from: process.env.FROM_EMAIL,
+        to: application.candidate.email,
+        subject: emailSubject,
+        html: emailContent   // ⚠️ tu avais oublié le contenu HTML !
+      });
+    }
+  } catch (error) {
+    console.error(
+      `Erreur lors de l'envoi d'email à ${application.candidate.email}:`,
+      error
+    );
+  }
+}
+
+  
+    // Supprimer la candidature
+    await application.destroy({ transaction: t });
+
+    // Décrémenter le compteur de candidatures de l'offre
+    if (application.jobOffer && application.jobOffer.applications_count > 0) {
+      await application.jobOffer.decrement('applications_count', { transaction: t });
     }
 
     await t.commit();
@@ -535,8 +624,15 @@ const bulkUpdateApplications = async (req, res) => {
 
 // Generate Google Meet link (simplified)
 function generateGoogleMeetLink() {
-  const meetingId = Math.random().toString(36).substring(2, 15);
-  return `https://meet.google.com/${meetingId}`;
+  // Générer un lien Google Meet valide
+  const characters = 'abcdefghijklmnopqrstuvwxyz';
+  
+  // Format Google Meet: https://meet.google.com/xxx-xxxx-xxx
+  const part1 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  const part2 = Array.from({length: 4}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  const part3 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  
+  return `https://meet.google.com/${part1}-${part2}-${part3}`;
 }
 
 module.exports = {

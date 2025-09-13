@@ -177,10 +177,13 @@
             <div *ngIf="application.cv" class="mb-3">
               <p class="text-sm text-gray-700">
                 <strong>CV :</strong> {{ application.cv.title }}
-                <button (click)="downloadCV(application.cv.id!)" 
+                <button (click)="downloadCV(application.cv.id!)"
                         class="ml-2 text-blue-600 hover:text-blue-800 text-xs">
                   📄 Télécharger
                 </button>
+                <span class="ml-2 text-xs text-gray-500">
+                  ({{ formatFileSize(application.cv.file_size) }})
+                </span>
               </p>
             </div>
 
@@ -190,6 +193,10 @@
               <p class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg line-clamp-3">
                 {{ application.cover_letter }}
               </p>
+              <button (click)="showFullCoverLetter(application)" 
+                      class="mt-2 text-blue-600 hover:text-blue-800 text-xs">
+                📖 Lire la lettre complète
+              </button>
             </div>
 
             <!-- Interview Slots -->
@@ -229,6 +236,11 @@
 
             <!-- Actions -->
             <div class="flex flex-wrap gap-2 pt-3 border-t">
+              <button (click)="viewApplicationDetails(application)" 
+                      class="btn btn-secondary text-sm">
+                👁️ Voir détails
+              </button>
+              
               <button *ngIf="application.status === 'applied'" 
                       (click)="updateStatus(application, 'under_review')"
                       class="btn btn-secondary text-sm">
@@ -350,6 +362,141 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal pour voir la lettre de motivation complète -->
+<div *ngIf="showCoverLetterModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+    <div class="mt-3">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium text-gray-900">📖 Lettre de motivation</h3>
+        <button (click)="closeCoverLetterModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div *ngIf="selectedApplicationForCoverLetter" class="mb-4 p-3 bg-blue-50 rounded-lg">
+        <p class="font-medium text-blue-900">
+          {{ selectedApplicationForCoverLetter.candidate?.firstName }} {{ selectedApplicationForCoverLetter.candidate?.lastName }}
+        </p>
+        <p class="text-sm text-blue-700">{{ selectedApplicationForCoverLetter.jobOffer?.title }}</p>
+      </div>
+
+      <div class="max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-lg">
+        <div class="whitespace-pre-wrap text-gray-800 leading-relaxed">
+          {{ selectedApplicationForCoverLetter?.cover_letter }}
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button (click)="closeCoverLetterModal()" class="btn btn-secondary">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal pour voir les détails complets de la candidature -->
+<div *ngIf="showApplicationDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+    <div class="mt-3">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-medium text-gray-900">📋 Détails de la candidature</h3>
+        <button (click)="closeApplicationDetailsModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div *ngIf="selectedApplicationDetails" class="space-y-6">
+        <!-- Informations candidat -->
+        <div class="bg-blue-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-blue-900 mb-3">👤 Informations du candidat</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p><strong>Nom :</strong> {{ selectedApplicationDetails.candidate?.firstName }} {{ selectedApplicationDetails.candidate?.lastName }}</p>
+              <p><strong>Email :</strong> {{ selectedApplicationDetails.candidate?.email }}</p>
+              <p *ngIf="selectedApplicationDetails.candidate?.phone">
+                <strong>Téléphone :</strong> {{ selectedApplicationDetails.candidate?.phone }}
+              </p>
+            </div>
+            <div>
+              <p *ngIf="selectedApplicationDetails.candidate?.location">
+                <strong>Localisation :</strong> {{ selectedApplicationDetails.candidate?.location }}
+              </p>
+              <p><strong>Date de candidature :</strong> {{ formatDate(selectedApplicationDetails.applied_at) }}</p>
+            </div>
+          </div>
+          <div *ngIf="selectedApplicationDetails.candidate?.bio" class="mt-3">
+            <p><strong>Bio :</strong></p>
+            <p class="text-gray-700 bg-white p-3 rounded mt-1">{{ selectedApplicationDetails.candidate?.bio }}</p>
+          </div>
+        </div>
+
+        <!-- CV -->
+        <div *ngIf="selectedApplicationDetails.cv" class="bg-green-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-green-900 mb-3">📄 CV du candidat</h4>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium">{{ selectedApplicationDetails.cv.title }}</p>
+              <p class="text-sm text-gray-600">{{ selectedApplicationDetails.cv.file_name }}</p>
+              <p class="text-xs text-gray-500">
+                {{ formatFileSize(selectedApplicationDetails.cv.file_size) }} • 
+                Uploadé le {{ formatDate(selectedApplicationDetails.cv.created_at) }}
+              </p>
+            </div>
+            <button (click)="downloadCV(selectedApplicationDetails.cv.id)" 
+                    class="btn btn-primary">
+              📥 Télécharger CV
+            </button>
+          </div>
+        </div>
+
+        <!-- Lettre de motivation -->
+        <div *ngIf="selectedApplicationDetails.cover_letter" class="bg-yellow-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-yellow-900 mb-3">✍️ Lettre de motivation</h4>
+          <div class="bg-white p-4 rounded border max-h-64 overflow-y-auto">
+            <div class="whitespace-pre-wrap text-gray-800 leading-relaxed">
+              {{ selectedApplicationDetails.cover_letter }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Créneaux proposés -->
+        <div *ngIf="selectedApplicationDetails.proposed_interview_slots && selectedApplicationDetails.proposed_interview_slots.length > 0" 
+             class="bg-purple-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-purple-900 mb-3">📅 Créneaux d'entretien proposés</h4>
+          <div class="space-y-2">
+            <div *ngFor="let slot of selectedApplicationDetails.proposed_interview_slots" 
+                 class="flex items-center justify-between p-2 bg-white rounded border">
+              <span class="text-sm">{{ formatDateTime(slot) }}</span>
+              <button *ngIf="selectedApplicationDetails.status === 'applied' || selectedApplicationDetails.status === 'under_review'" 
+                      (click)="quickScheduleInterview(selectedApplicationDetails, slot)"
+                      class="text-green-600 hover:text-green-800 text-xs">
+                ✅ Confirmer ce créneau
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes du recruteur -->
+        <div *ngIf="selectedApplicationDetails.recruiter_notes" class="bg-gray-50 p-4 rounded-lg">
+          <h4 class="font-semibold text-gray-900 mb-3">📝 Notes du recruteur</h4>
+          <div class="whitespace-pre-wrap text-gray-700">{{ selectedApplicationDetails.recruiter_notes }}</div>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button (click)="closeApplicationDetailsModal()" class="btn btn-secondary">
+          Fermer
+        </button>
+      </div>
     </div>
   </div>
 </div>

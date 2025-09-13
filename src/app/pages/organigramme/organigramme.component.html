@@ -30,17 +30,18 @@
       <div *ngFor="let rootNode of orgChart" class="org-tree">
         <div class="org-node-container">
           <div [class]="'org-node ' + getNodeClass(rootNode.level)">
- <div class="node-avatar">
-    <!-- Image de profil si disponible -->
-    <img *ngIf="hasEmployeeProfileImage(rootNode.name)" 
-         [src]="getEmployeeProfileImage(rootNode.name)" 
-         [alt]="rootNode.name"
-         class="w-full h-full object-cover rounded-full">
-    <!-- Avatar par défaut -->
-    <span *ngIf="!hasEmployeeProfileImage(rootNode.name)">
-      {{ getInitials(rootNode.name) }}
-    </span>
-  </div>
+            <div class="node-avatar">
+              <!-- Image de profil si disponible -->
+              <img *ngIf="hasEmployeeProfileImage(rootNode.name)" 
+                   [src]="getEmployeeProfileImage(rootNode.name)" 
+                   [alt]="rootNode.name"
+                   class="w-full h-full object-cover rounded-full"
+                   (error)="onImageError($event, rootNode.name)">
+              <!-- Avatar par défaut -->
+              <span *ngIf="!hasEmployeeProfileImage(rootNode.name)">
+                {{ getInitials(rootNode.name) }}
+              </span>
+            </div>
             <div class="node-info">
               <h4 class="node-name">{{ rootNode.name }}</h4>
               <p class="node-position">{{ rootNode.position }}</p>
@@ -57,7 +58,16 @@
               <div class="branch-line"></div>
               <div [class]="'org-node ' + getNodeClass(child.level)">
                 <div class="node-avatar">
-                  {{ child.name.charAt(0).toUpperCase() }}
+                  <!-- Image de profil si disponible -->
+                  <img *ngIf="hasEmployeeProfileImage(child.name)" 
+                       [src]="getEmployeeProfileImage(child.name)" 
+                       [alt]="child.name"
+                       class="w-full h-full object-cover rounded-full"
+                       (error)="onImageError($event, child.name)">
+                  <!-- Avatar par défaut -->
+                  <span *ngIf="!hasEmployeeProfileImage(child.name)">
+                    {{ getInitials(child.name) }}
+                  </span>
                 </div>
                 <div class="node-info">
                   <h4 class="node-name">{{ child.name }}</h4>
@@ -74,7 +84,16 @@
                     <div class="sub-branch-line"></div>
                     <div [class]="'org-node small ' + getNodeClass(subChild.level)">
                       <div class="node-avatar small">
-                        {{ subChild.name.charAt(0).toUpperCase() }}
+                        <!-- Image de profil si disponible -->
+                        <img *ngIf="hasEmployeeProfileImage(subChild.name)" 
+                             [src]="getEmployeeProfileImage(subChild.name)" 
+                             [alt]="subChild.name"
+                             class="w-full h-full object-cover rounded-full"
+                             (error)="onImageError($event, subChild.name)">
+                        <!-- Avatar par défaut -->
+                        <span *ngIf="!hasEmployeeProfileImage(subChild.name)">
+                          {{ getInitials(subChild.name) }}
+                        </span>
                       </div>
                       <div class="node-info">
                         <h5 class="node-name small">{{ subChild.name }}</h5>

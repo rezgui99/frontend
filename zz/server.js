@@ -27,7 +27,6 @@ const authRoutes = require("./src/routes/auth");
 const userManagementRoutes = require("./src/routes/userManagement");
 const jobOfferRoutes = require("./src/routes/joboffer");
  const analyticsRoutes = require("./src/routes/analytics");
- const gpecAlertsRoutes = require("./src/routes/gpec-alerts");
 const { authenticateToken } = require("./src/middleware/auth");
 
 // Routes candidats
@@ -72,7 +71,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", userManagementRoutes);
 app.use("/api/job-offers", jobOfferRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use("/api/gpec-alerts", gpecAlertsRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
 
 // Routes candidats

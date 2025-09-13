@@ -17,7 +17,6 @@ import { JobOfferComponent } from './pages/job-offer/job-offer.component';
 import { EnhancedUserManagementComponent } from './pages/enhanced-user-management/enhanced-user-management.component';
 import { AdvancedAnalyticsComponent } from './pages/advanced-analytics/advanced-analytics.component';
 import { JobOffersListComponent } from './pages/job-offers-list/job-offers-list.component';
-import { GPECAlertsComponent } from './pages/gpec-alerts/gpec-alerts.component';
 import { WelcomeComponent } from './pages/welcome/welcome.component';
 import { LoginSelectorComponent } from './components/login-selector/login-selector.component';
 import { CandidateAuthGuard } from './guards/candidate-auth.guard';
@@ -52,7 +51,7 @@ export const routes: Routes = [
   { path: 'job-offers', component: JobOfferComponent, canActivate: [AuthGuard] },
   { path: 'job-offer-list', component: JobOffersListComponent, canActivate: [AuthGuard] },
   { path: 'admin/users-enhanced', component: EnhancedUserManagementComponent, canActivate: [AuthGuard], data: { roles: ['admin'] } },
-  { path: 'gpec-alerts', component: GPECAlertsComponent, canActivate: [AuthGuard], data: { roles: ['admin', 'hr'] } },
+  
   
   // Routes candidats
   { 

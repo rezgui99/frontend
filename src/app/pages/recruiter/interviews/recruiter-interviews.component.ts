@@ -39,6 +39,10 @@ export class RecruiterInterviewsComponent implements OnInit {
   // Modal states
   showScheduleModal = false;
   scheduleForm: FormGroup;
+  
+  // Nouveaux modals pour les documents
+  showInterviewCoverLetterModal = false;
+  selectedInterviewForCoverLetter: Interview | null = null;
 
   // Options
   statusOptions = [
@@ -355,4 +359,22 @@ export class RecruiterInterviewsComponent implements OnInit {
     tomorrow.setHours(8, 0, 0, 0);
     return tomorrow.toISOString().slice(0, 16);
   }
+
+  // Télécharger CV depuis un entretien
+  downloadCVFromInterview(interviewId: number, cvId: number): void {
+    window.open(`http://localhost:3000/api/interviews/${interviewId}/cv/${cvId}/download`, '_blank');
+  }
+
+  // Voir la lettre de motivation depuis un entretien
+  showCoverLetterForInterview(interview: Interview): void {
+    this.selectedInterviewForCoverLetter = interview;
+    this.showInterviewCoverLetterModal = true;
+  }
+
+  closeInterviewCoverLetterModal(): void {
+    this.showInterviewCoverLetterModal = false;
+    this.selectedInterviewForCoverLetter = null;
+  }
+
+
 }
