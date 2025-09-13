@@ -41,7 +41,7 @@ export class CandidateApplyComponent implements OnInit {
     private formBuilder: FormBuilder
   ) {
     this.applicationForm = this.formBuilder.group({
-      cv_id: [''],
+      cv_id: ['', Validators.required],
       cover_letter: ['', [Validators.required, Validators.minLength(50)]],
       interview_slot_1: [''],
       interview_slot_2: [''],
@@ -153,13 +153,18 @@ ${this.currentCandidate.firstName} ${this.currentCandidate.lastName}`;
 
     const applicationData: JobApplicationRequest = {
       job_offer_id: this.jobOffer.id!,
-      cv_id: this.applicationForm.value.cv_id || undefined,
+      cv_id: this.applicationForm.value.cv_id ? parseInt(this.applicationForm.value.cv_id) : undefined,
       cover_letter: this.applicationForm.value.cover_letter,
       proposed_interview_slots: proposedSlots
     };
 
+    console.log('📤 Sending application data:', applicationData);
+    console.log('📄 CV ID:', applicationData.cv_id);
+    console.log('✍️ Cover letter length:', applicationData.cover_letter?.length);
+    console.log('📅 Proposed slots:', applicationData.proposed_interview_slots);
     this.candidateService.applyToJobOffer(applicationData).subscribe({
       next: (response) => {
+        console.log('✅ Application submitted successfully:', response);
         this.successMessage = response.message;
         
         // Rediriger vers les candidatures après 2 secondes
@@ -187,9 +192,18 @@ ${this.currentCandidate.firstName} ${this.currentCandidate.lastName}`;
     
     if (field?.errors && field.touched) {
       if (field.errors['required']) {
+        if (fieldName === 'cv_id') {
+          return 'Veuillez sélectionner un CV';
+        }
+        if (fieldName === 'cover_letter') {
+          return 'La lettre de motivation est requise';
+        }
         return 'Ce champ est requis';
       }
       if (field.errors['minlength']) {
+        if (fieldName === 'cover_letter') {
+          return `Lettre de motivation trop courte (minimum ${field.errors['minlength'].requiredLength} caractères)`;
+        }
         return `Minimum ${field.errors['minlength'].requiredLength} caractères`;
       }
     }
