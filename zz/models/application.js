@@ -41,7 +41,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       cv_id: {
         type: DataTypes.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'CandidateCVs',
           key: 'id'
@@ -49,7 +49,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       cover_letter: {
         type: DataTypes.TEXT,
-        allowNull: true
+        allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [50, 5000]
+        }
       },
       status: {
         type: DataTypes.ENUM('applied', 'under_review', 'interview_scheduled', 'interview_completed', 'accepted', 'rejected'),

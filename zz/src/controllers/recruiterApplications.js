@@ -1,6 +1,6 @@
 const db = require("../../models/index");
 const nodemailer = require('nodemailer');
-const { Application, JobOffer, Candidate, CandidateCV, JobDescription, sequelize } = db;
+const { Application, JobOffer, Candidate, CandidateCV, JobDescription, Interview, sequelize } = db;
 
 // Configuration email
 const transporter = nodemailer.createTransport({
@@ -76,6 +76,7 @@ const getAllApplications = async (req, res) => {
   try {
     console.log('📋 Getting all applications for recruiter...');
     console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    console.log('🔍 Query parameters:', req.query);
     
     const { 
       status, 
@@ -85,6 +86,7 @@ const getAllApplications = async (req, res) => {
       limit = 20 
     } = req.query;
 
+    // Initialiser whereConditions
     const whereConditions = {};
     if (status) whereConditions.status = status;
     if (job_offer_id) whereConditions.job_offer_id = job_offer_id;
@@ -98,6 +100,22 @@ const getAllApplications = async (req, res) => {
         { lastName: { [sequelize.Sequelize.Op.iLike]: `%${search}%` } },
         { email: { [sequelize.Sequelize.Op.iLike]: `%${search}%` } }
       ];
+    }
+
+    console.log('🔍 Where conditions:', whereConditions);
+    console.log('🔍 Candidate where:', candidateWhere);
+
+    // Vérifier que les modèles existent
+    if (!Application || !Candidate || !JobOffer) {
+      console.error('❌ Required models not found:', {
+        Application: !!Application,
+        Candidate: !!Candidate,
+        JobOffer: !!JobOffer
+      });
+      return res.status(500).json({ 
+        error: 'Database models not properly configured',
+        details: 'Application, Candidate, or JobOffer model missing'
+      });
     }
 
     const { count, rows: applications } = await Application.findAndCountAll({
@@ -114,7 +132,7 @@ const getAllApplications = async (req, res) => {
           model: CandidateCV,
           as: 'cv',
           required: false,
-          attributes: ['id', 'title', 'file_path', 'file_name']
+          attributes: ['id', 'title', 'file_path', 'file_name', 'file_size']
         },
         {
           model: JobOffer,
@@ -131,7 +149,8 @@ const getAllApplications = async (req, res) => {
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['applied_at', 'DESC']]
+      order: [['applied_at', 'DESC']],
+      distinct: true
     });
 
     console.log('✅ Applications found:', applications.length);
@@ -149,7 +168,16 @@ const getAllApplications = async (req, res) => {
 
   } catch (error) {
     console.error('Error getting all applications:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error SQL:', error.sql);
+    
+    // Retourner une erreur plus détaillée
+    res.status(500).json({ 
+      error: error.message,
+      details: error.name,
+      sql: error.sql ? 'SQL Error - Check logs' : undefined
+    });
   }
 };
 
@@ -273,7 +301,9 @@ const scheduleInterview = async (req, res) => {
   try {
     const { 
       confirmed_interview_date, 
-      interview_link, 
+      interview_type = 'video',
+      location,
+      meeting_link,
       recruiter_notes 
     } = req.body;
 
@@ -303,11 +333,27 @@ const scheduleInterview = async (req, res) => {
       return res.status(400).json({ error: 'La date d\'entretien doit être dans le futur' });
     }
 
-    // Générer un lien Google Meet si pas fourni
-    const meetLink = interview_link || generateGoogleMeetLink();
+    // Générer un lien selon le type d'entretien
+    let finalMeetingLink = meeting_link;
+    let finalLocation = location;
+    
+    if (interview_type === 'video' && !meeting_link) {
+      finalMeetingLink = generateGoogleMeetLink();
+    }
+    
+    if (interview_type === 'in_person' && !location) {
+      finalLocation = 'Adresse à confirmer';
+    }
+
+    // Vérifier si le modèle Interview existe
+    if (!db.Interview) {
+      console.error('❌ Interview model not found in database');
+      await t.rollback();
+      return res.status(500).json({ error: 'Modèle Interview non configuré' });
+    }
 
     // Chercher un entretien existant pour cette candidature
-    let interview = await Interview.findOne({
+    let interview = await db.Interview.findOne({
       where: { application_id: application.id },
       transaction: t
     });
@@ -316,20 +362,23 @@ const scheduleInterview = async (req, res) => {
       // Mettre à jour l'entretien existant
       await interview.update({
         scheduled_date: interviewDate,
-        meeting_link: meetLink,
+        interview_type,
+        location: finalLocation,
+        meeting_link: finalMeetingLink,
         status: 'confirmed',
         notes: recruiter_notes ? `${interview.notes || ''}\n\n[MISE À JOUR] ${recruiter_notes}` : interview.notes,
         interviewer_id: req.user.id
       }, { transaction: t });
     } else {
       // Créer un nouvel entretien
-      interview = await Interview.create({
+      interview = await db.Interview.create({
         application_id: application.id,
         interviewer_id: req.user.id,
         scheduled_date: interviewDate,
         duration_minutes: 60,
-        interview_type: 'video',
-        meeting_link: meetLink,
+        interview_type,
+        location: finalLocation,
+        meeting_link: finalMeetingLink,
         status: 'confirmed',
         notes: recruiter_notes,
         decision: 'pending',
@@ -341,11 +390,11 @@ const scheduleInterview = async (req, res) => {
     await application.update({
       status: 'interview_scheduled',
       confirmed_interview_date: interviewDate,
-      interview_link: meetLink,
+      interview_link: finalMeetingLink,
       recruiter_notes: recruiter_notes ? `${application.recruiter_notes || ''}\n\n[ENTRETIEN] Programmé le ${new Date().toLocaleString('fr-FR')} - ${recruiter_notes}` : application.recruiter_notes
     }, { transaction: t });
 
-    // Envoyer email de confirmation détaillé au candidat
+    // Envoyer email de confirmation avec détails complets
     try {
       await transporter.sendMail({
         from: process.env.FROM_EMAIL,
@@ -366,20 +415,24 @@ const scheduleInterview = async (req, res) => {
               <ul style="list-style: none; padding: 0;">
                 <li style="margin: 10px 0;"><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</li>
                 <li style="margin: 10px 0;"><strong>⏱️ Durée :</strong> ${interview.duration_minutes} minutes</li>
-                <li style="margin: 10px 0;"><strong>🎯 Type :</strong> Entretien vidéo</li>
-                <li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${meetLink}" style="color: #10b981; font-weight: bold; text-decoration: none;">${meetLink}</a></li>
+                <li style="margin: 10px 0;"><strong>🎯 Type :</strong> ${getInterviewTypeLabel(interview_type)}</li>
+                ${finalMeetingLink ? `<li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${finalMeetingLink}" style="color: #10b981; font-weight: bold; text-decoration: none;">${finalMeetingLink}</a></li>` : ''}
+                ${finalLocation ? `<li style="margin: 10px 0;"><strong>📍 Lieu :</strong> ${finalLocation}</li>` : ''}
                 <li style="margin: 10px 0;"><strong>📍 Poste :</strong> ${application.jobOffer.title}</li>
                 <li style="margin: 10px 0;"><strong>🏢 Entreprise :</strong> ${application.jobOffer.company}</li>
+                <li style="margin: 10px 0;"><strong>👤 Recruteur :</strong> ${req.user.firstName} ${req.user.lastName}</li>
               </ul>
             </div>
 
             <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
               <ul style="color: #6b7280; font-size: 14px;">
-                <li>Testez votre connexion et votre matériel 15 minutes avant</li>
+                ${interview_type === 'video' ? '<li>Testez votre connexion et votre matériel 15 minutes avant</li>' : ''}
+                ${interview_type === 'phone' ? '<li>Assurez-vous d\'être dans un endroit calme avec une bonne réception</li>' : ''}
+                ${interview_type === 'in_person' ? '<li>Prévoyez d\'arriver 10 minutes en avance</li>' : ''}
                 <li>Préparez vos questions sur l'entreprise et le poste</li>
                 <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
-                <li>Trouvez un endroit calme et bien éclairé</li>
+                ${interview_type === 'video' ? '<li>Trouvez un endroit calme et bien éclairé</li>' : ''}
                 <li>Préparez des exemples concrets de vos réalisations</li>
               </ul>
             </div>
@@ -397,30 +450,6 @@ const scheduleInterview = async (req, res) => {
                 Si vous avez des questions ou besoin de reporter, contactez notre équipe RH.
               </p>
             </div>
-              <li style="margin: 10px 0;"><strong>📍 Poste :</strong> ${application.jobOffer.title}</li>
-              <li style="margin: 10px 0;"><strong>🏢 Entreprise :</strong> ${application.jobOffer.company}</li>
-            </ul>
-          </div>
-          
-            <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
-              <ul style="color: #6b7280; font-size: 14px;">
-                <li>Testez votre connexion et votre matériel 15 minutes avant</li>
-                <li>Préparez vos questions sur l'entreprise et le poste</li>
-                <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
-                <li>Trouvez un endroit calme et bien éclairé</li>
-                <li>Préparez des exemples concrets de vos réalisations</li>
-              </ul>
-            </div>
-          
-          ${recruiter_notes ? `<p><strong>Notes du recruteur :</strong> ${recruiter_notes}</p>` : ''}
-          
-            <div style="text-align: center; margin: 30px 0;">
-              <p style="color: #10b981; font-weight: bold;">🍀 Nous avons hâte de vous rencontrer !</p>
-              <p style="color: #6b7280; font-size: 12px;">
-                Si vous avez des questions ou besoin de reporter, contactez notre équipe RH.
-              </p>
-            </div>
           </div>
         `
       });
@@ -430,7 +459,6 @@ const scheduleInterview = async (req, res) => {
       console.error('Erreur envoi email entretien:', emailError);
     }
 
-      console.log('✅ Interview cancelled due to application withdrawal:', associatedInterview.id);
     res.json({
       message: 'Entretien programmé avec succès',
       application,
@@ -559,54 +587,53 @@ const bulkUpdateApplications = async (req, res) => {
     });
 
     // Envoyer des emails aux candidats concernés
-for (const application of applications) {
-  try {
-    let emailSubject, emailContent;
-    
-    switch (status) {
-      case 'rejected':
-        emailSubject = `Candidature - ${application.jobOffer.title}`;
-        emailContent = `
-          <p>Bonjour ${application.candidate.firstName},</p>
-          <p>Nous vous remercions pour votre candidature au poste de ${application.jobOffer.title}.</p>
-          <p>Après examen, nous avons décidé de ne pas donner suite à votre candidature pour ce poste.</p>
-          <p>Nous vous encourageons à consulter nos autres offres.</p>
-        `;
-        break;
+    for (const application of applications) {
+      try {
+        let emailSubject, emailContent;
         
-      case 'under_review':
-        emailSubject = `Candidature en cours d'examen - ${application.jobOffer.title}`;
-        emailContent = `
-          <p>Bonjour ${application.candidate.firstName},</p>
-          <p>Votre candidature pour le poste de ${application.jobOffer.title} est en cours d'examen.</p>
-          <p>Nous vous contacterons prochainement.</p>
-        `;
-        break;
-    }
+        switch (status) {
+          case 'rejected':
+            emailSubject = `Candidature - ${application.jobOffer.title}`;
+            emailContent = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #374151;">Candidature</h1>
+                <p>Bonjour ${application.candidate.firstName},</p>
+                <p>Nous vous remercions pour votre candidature au poste de <strong>${application.jobOffer.title}</strong>.</p>
+                <p>Après examen, nous avons décidé de ne pas donner suite à votre candidature pour ce poste.</p>
+                <p>Nous vous encourageons à consulter nos autres offres qui pourraient mieux correspondre à votre profil.</p>
+                <p>Nous vous souhaitons bonne chance dans vos recherches.</p>
+              </div>
+            `;
+            break;
+            
+          case 'under_review':
+            emailSubject = `Candidature en cours d'examen - ${application.jobOffer.title}`;
+            emailContent = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #2196F3;">Candidature en cours d'examen</h1>
+                <p>Bonjour ${application.candidate.firstName},</p>
+                <p>Votre candidature pour le poste de <strong>${application.jobOffer.title}</strong> est actuellement en cours d'examen par notre équipe.</p>
+                <p>Nous vous contacterons prochainement pour la suite du processus.</p>
+                <p>Merci pour votre patience.</p>
+              </div>
+            `;
+            break;
+        }
 
-    if (emailSubject && emailContent) {
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL,
-        to: application.candidate.email,
-        subject: emailSubject,
-        html: emailContent   // ⚠️ tu avais oublié le contenu HTML !
-      });
-    }
-  } catch (error) {
-    console.error(
-      `Erreur lors de l'envoi d'email à ${application.candidate.email}:`,
-      error
-    );
-  }
-}
-
-  
-    // Supprimer la candidature
-    await application.destroy({ transaction: t });
-
-    // Décrémenter le compteur de candidatures de l'offre
-    if (application.jobOffer && application.jobOffer.applications_count > 0) {
-      await application.jobOffer.decrement('applications_count', { transaction: t });
+        if (emailSubject && emailContent) {
+          await transporter.sendMail({
+            from: process.env.FROM_EMAIL,
+            to: application.candidate.email,
+            subject: emailSubject,
+            html: emailContent
+          });
+        }
+      } catch (error) {
+        console.error(
+          `Erreur lors de l'envoi d'email à ${application.candidate.email}:`,
+          error
+        );
+      }
     }
 
     await t.commit();
@@ -620,6 +647,127 @@ for (const application of applications) {
     console.error('Error bulk updating applications:', error);
     res.status(500).json({ error: error.message });
   }
+};
+
+// Get application details with CV and cover letter
+const getApplicationDetails = async (req, res) => {
+  try {
+    const application = await Application.findByPk(req.params.id, {
+      include: [
+        {
+          model: Candidate,
+          as: 'candidate',
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'location', 'bio']
+        },
+        {
+          model: CandidateCV,
+          as: 'cv',
+          attributes: ['id', 'title', 'file_path', 'file_name', 'file_size', 'created_at']
+        },
+        {
+          model: JobOffer,
+          as: 'jobOffer',
+          attributes: ['id', 'title', 'company', 'location'],
+          include: [{
+            model: JobDescription,
+            as: 'jobDescription',
+            attributes: ['id', 'emploi', 'filiere_activite']
+          }]
+        }
+      ]
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Candidature non trouvée' });
+    }
+
+    res.json(application);
+
+  } catch (error) {
+    console.error('Error getting application details:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Download CV for recruiter
+const downloadCandidateCV = async (req, res) => {
+  try {
+    const { cv_id } = req.params;
+    
+    const cv = await CandidateCV.findByPk(cv_id);
+    
+    if (!cv) {
+      return res.status(404).json({ error: 'CV non trouvé' });
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '..', cv.file_path);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Fichier CV non trouvé sur le serveur' });
+    }
+
+    res.download(filePath, cv.file_name);
+
+  } catch (error) {
+    console.error('Error downloading CV:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get available applications for interview scheduling
+const getAvailableApplicationsForInterview = async (req, res) => {
+  try {
+    console.log('📋 Getting available applications for interview...');
+    console.log('👤 Request user:', req.user ? `${req.user.username} (${req.user.role})` : 'None');
+    
+    const applications = await Application.findAll({
+      where: {
+        status: { [sequelize.Sequelize.Op.in]: ['applied', 'under_review'] }
+      },
+      include: [
+        {
+          model: Candidate,
+          as: 'candidate',
+          required: false,
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
+        },
+        {
+          model: JobOffer,
+          as: 'jobOffer',
+          required: false,
+          attributes: ['id', 'title', 'company']
+        }
+      ],
+      order: [['applied_at', 'DESC']],
+      limit: 50
+    });
+
+    console.log('✅ Available applications found:', applications.length);
+    
+    res.json({
+      applications
+    });
+
+  } catch (error) {
+    console.error('Error getting available applications:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Fonction utilitaire pour obtenir le label du type d'entretien
+const getInterviewTypeLabel = (type) => {
+  const labels = {
+    'phone': 'Entretien téléphonique',
+    'video': 'Entretien vidéo',
+    'in_person': 'Entretien en personne',
+    'technical': 'Entretien technique',
+    'hr': 'Entretien RH',
+    'final': 'Entretien final'
+  };
+  return labels[type] || 'Entretien';
 };
 
 // Generate Google Meet link (simplified)
@@ -641,5 +789,8 @@ module.exports = {
   updateApplicationStatus,
   scheduleInterview,
   getApplicationStatistics,
-  bulkUpdateApplications
+  bulkUpdateApplications,
+  getApplicationDetails,
+  downloadCandidateCV,
+  getAvailableApplicationsForInterview
 };

@@ -19,6 +19,8 @@ export interface Interview {
   // Relations
   application?: {
     id: number;
+    cover_letter?: string;
+    applied_at?: string;
     candidate?: {
       id: number;
       firstName: string;
@@ -30,6 +32,14 @@ export interface Interview {
       id: number;
       title: string;
       company: string;
+    };
+    cv?: {
+      id: number;
+      title: string;
+      file_name: string;
+      file_size: number;
+      file_path: string;
+      created_at?: string;
     };
   };
   interviewer?: {
@@ -67,12 +77,18 @@ export interface UpdateInterviewRequest {
   decision?: InterviewDecision;
 }
 
+// === INTERFACES STATISTIQUES ===
 export interface InterviewStatistics {
-  totalInterviews: number;
-  statusBreakdown: { [key in InterviewStatus]: number };
-  typeBreakdown: { [key in InterviewType]: number };
-  averageScore: number;
-  upcomingInterviews: number;
+  total_interviews: number;
+  upcoming_interviews: number;
+  status_breakdown: { [key in InterviewStatus]: number };
+  type_breakdown: { [key in InterviewType]: number };
+  interviewer_breakdown: Array<{
+    interviewer_id: number;
+    interviewer_name: string;
+    count: number;
+  }>;
+  average_score: number | null;
 }
 
 export interface InterviewFilters {
@@ -82,4 +98,33 @@ export interface InterviewFilters {
   date_to?: string;
   page?: number;
   limit?: number;
+}
+
+// === INTERFACES POUR LES RÉPONSES API ===
+export interface InterviewsResponse {
+  interviews: Interview[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface AvailableApplication {
+  id: number;
+  candidate?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  };
+  jobOffer?: {
+    id: number;
+    title: string;
+    company: string;
+  };
+  status: string;
+  applied_at: string;
 }

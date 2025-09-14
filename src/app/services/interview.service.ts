@@ -1,76 +1,16 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { 
+  Interview, 
+  InterviewFilters, 
+  InterviewStatistics, 
+  CreateInterviewRequest, 
+  UpdateInterviewRequest,
+  InterviewsResponse
+} from '../models/candidate.model';
 import { environment } from '../../environments/environment';
-
-export interface Interview {
-  id?: number;
-  application_id: number;
-  interviewer_id: number;
-  scheduled_date: string;
-  duration_minutes: number;
-  interview_type: string;
-  status: string;
-  meeting_link?: string;
-  notes?: string;
-  score?: number;
-  feedback?: string;
-  decision?: string;
-  reminder_sent: boolean;
-  application?: {
-    candidate: {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone?: string;
-    };
-    jobOffer: {
-      title: string;
-      company: string;
-    };
-  };
-  interviewer?: {
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-}
-
-export interface InterviewFilters {
-  status?: string;
-  interview_type?: string;
-  date_from?: string;
-  date_to?: string;
-  page?: number;
-  limit?: number;
-}
-
-export interface InterviewStatistics {
-  total_interviews: number;
-  upcoming_interviews: number;
-  status_breakdown: {
-    scheduled: number;
-    confirmed: number;
-    in_progress: number;
-    completed: number;
-    cancelled: number;
-    rescheduled: number;
-  };
-  type_breakdown: {
-    phone: number;
-    video: number;
-    in_person: number;
-    technical: number;
-    hr: number;
-    final: number;
-  };
-  interviewer_breakdown: Array<{
-    interviewer_id: number;
-    interviewer_name: string;
-    count: number;
-  }>;
-  average_score: number | null;
-}
 
 @Injectable({
   providedIn: 'root'
@@ -80,7 +20,7 @@ export class InterviewService {
 
   constructor(private http: HttpClient) {}
 
-  getInterviews(filters: InterviewFilters = {}): Observable<any> {
+  getInterviews(filters: InterviewFilters = {}): Observable<InterviewsResponse> {
     let params = new HttpParams();
     
     // Ajouter les filtres aux paramètres de requête
@@ -91,42 +31,92 @@ export class InterviewService {
       }
     });
  
-    return this.http.get(`${this.apiUrl}`, { params });
+    return this.http.get<InterviewsResponse>(`${this.apiUrl}`, { params }).pipe(
+      catchError(this.handleError)
+    );
   }
 
   getStatistics(): Observable<InterviewStatistics> {
-    return this.http.get<InterviewStatistics>(`${this.apiUrl}/statistics`);
+    return this.http.get<InterviewStatistics>(`${this.apiUrl}/statistics`).pipe(
+      catchError(this.handleError)
+    );
   }
 
   getUpcomingInterviews(period: string = 'today'): Observable<Interview[]> {
-    return this.http.get<Interview[]>(`${this.apiUrl}/upcoming?period=${period}`);
+    return this.http.get<Interview[]>(`${this.apiUrl}/upcoming?period=${period}`).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  getInterviewTypeLabels(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/interview-types`);
+  getInterviewTypeLabels(): Observable<{ [key: string]: string }> {
+    return this.http.get<{ [key: string]: string }>(`${this.apiUrl}/interview-types`).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  scheduleInterview(interviewData: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}`, interviewData);
+  scheduleInterview(interviewData: CreateInterviewRequest): Observable<{ message: string; interview: Interview }> {
+    return this.http.post<{ message: string; interview: Interview }>(`${this.apiUrl}`, interviewData).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  updateInterview(interviewId: number, updateData: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${interviewId}`, updateData);
+  updateInterview(interviewId: number, updateData: UpdateInterviewRequest): Observable<{ message: string; interview: Interview }> {
+    return this.http.put<{ message: string; interview: Interview }>(`${this.apiUrl}/${interviewId}`, updateData).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  cancelInterview(interviewId: number, reason: string): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${interviewId}/cancel`, { reason });
+  cancelInterview(interviewId: number, reason: string): Observable<{ message: string; interview: Interview }> {
+    return this.http.patch<{ message: string; interview: Interview }>(`${this.apiUrl}/${interviewId}/cancel`, { reason }).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  completeInterview(interviewId: number, data: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${interviewId}/complete`, data);
+  completeInterview(interviewId: number, data: { score: number; feedback: string; decision: string }): Observable<{ message: string; interview: Interview }> {
+    return this.http.patch<{ message: string; interview: Interview }>(`${this.apiUrl}/${interviewId}/complete`, data).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  rescheduleInterview(interviewId: number, data: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${interviewId}/reschedule`, data);
+  rescheduleInterview(interviewId: number, data: { new_scheduled_date: string; reason: string }): Observable<{ message: string; interview: Interview }> {
+    return this.http.patch<{ message: string; interview: Interview }>(`${this.apiUrl}/${interviewId}/reschedule`, data).pipe(
+      catchError(this.handleError)
+    );
   }
 
-  sendInterviewConfirmation(interviewId: number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${interviewId}/send-confirmation`, {});
+  sendInterviewConfirmation(interviewId: number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/${interviewId}/send-confirmation`, {}).pipe(
+      catchError(this.handleError)
+    );
   }
+
+  downloadCVFromInterview(interviewId: number, cvId: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${interviewId}/cv/${cvId}/download`, {
+      responseType: 'blob'
+    }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  private handleError = (error: any): Observable<never> => {
+    console.error('❌ InterviewService - Error:', error);
+    
+    let errorMessage = 'Une erreur est survenue';
+    
+    if (error.status === 0) {
+      errorMessage = 'Impossible de contacter le serveur. Vérifiez que le backend est démarré.';
+    } else if (error.status === 401) {
+      errorMessage = 'Non autorisé. Veuillez vous reconnecter.';
+    } else if (error.status === 403) {
+      errorMessage = 'Accès interdit. Permissions insuffisantes.';
+    } else if (error.status === 404) {
+      errorMessage = 'Ressource non trouvée.';
+    } else if (error.status === 500) {
+      errorMessage = 'Erreur serveur interne. Vérifiez les logs du backend.';
+    } else if (error.error?.message) {
+      errorMessage = error.error.message;
+    }
+
+    return throwError(() => new Error(errorMessage));
+  };
 }

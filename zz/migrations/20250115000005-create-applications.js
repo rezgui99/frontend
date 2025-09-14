@@ -56,27 +56,22 @@ module.exports = {
       },
       cv_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'CandidateCVs',
           key: 'id'
         },
         onUpdate: 'CASCADE',
-        onDelete: 'SET NULL'
+        onDelete: 'RESTRICT'
       },
       cover_letter: {
         type: Sequelize.TEXT,
-        allowNull: true
+        allowNull: false
       },
       status: {
         type: Sequelize.ENUM('applied', 'under_review', 'interview_scheduled', 'interview_completed', 'accepted', 'rejected'),
         allowNull: false,
         defaultValue: 'applied'
-      },
-      proposed_interview_slots: {
-        type: Sequelize.JSON,
-        allowNull: true,
-        defaultValue: []
       },
       confirmed_interview_date: {
         type: Sequelize.DATE,

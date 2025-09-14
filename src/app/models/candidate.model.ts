@@ -49,6 +49,39 @@ export interface CandidateCV {
   updated_at?: string;
 }
 
+// === INTERFACES ENTRETIENS ===
+export interface Interview {
+  id?: number;
+  application_id: number;
+  interviewer_id: number;
+  scheduled_date: string;
+  duration_minutes: number;
+  interview_type: InterviewType;
+  location?: string;
+  meeting_link?: string;
+  status: InterviewStatus;
+  notes?: string;
+  score?: number;
+  feedback?: string;
+  decision: InterviewDecision;
+  reminder_sent: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  
+  // Relations
+  application?: Application;
+  interviewer?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+export type InterviewType = 'phone' | 'video' | 'in_person' | 'technical' | 'hr' | 'final';
+export type InterviewStatus = 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled';
+export type InterviewDecision = 'pending' | 'pass' | 'fail' | 'on_hold';
+
 // === INTERFACES CANDIDATURES ===
 export interface Application {
   id?: number;
@@ -57,7 +90,6 @@ export interface Application {
   cv_id?: number;
   cover_letter?: string;
   status: ApplicationStatus;
-  proposed_interview_slots?: string[];
   confirmed_interview_date?: string;
   interview_link?: string;
   recruiter_notes?: string;
@@ -71,6 +103,9 @@ export interface Application {
   JobOffer?: JobOffer; // Alternative naming from backend
   cv?: CandidateCV;
   CandidateCV?: CandidateCV; // Alternative naming from backend
+  
+  // Interview relation (when populated from backend)
+  interview?: Interview;
 }
 
 export type ApplicationStatus = 
@@ -85,7 +120,6 @@ export interface JobApplicationRequest {
   job_offer_id: number;
   cv_id?: number;
   cover_letter?: string;
-  proposed_interview_slots?: string[];
 }
 
 // === INTERFACES FAVORIS ===
@@ -203,4 +237,99 @@ export interface JobOfferStats {
   totalApplications: number;
   activeOffers: number;
   recentOffers: number;
+}
+
+// === INTERFACES POUR LES SERVICES ===
+export interface ApplicationsResponse {
+  applications: Application[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface ApplicationStatistics {
+  totalApplications: number;
+  statusBreakdown: { [key: string]: number };
+  recentApplications: number;
+  interviewsScheduled: number;
+}
+
+// Export des types pour isolatedModules
+
+
+// === INTERFACES POUR LES ENTRETIENS ===
+export interface InterviewStatistics {
+  total_interviews: number;
+  upcoming_interviews: number;
+  status_breakdown: { [key in InterviewStatus]: number };
+  type_breakdown: { [key in InterviewType]: number };
+  interviewer_breakdown: Array<{
+    interviewer_id: number;
+    interviewer_name: string;
+    count: number;
+  }>;
+  average_score: number | null;
+}
+
+export interface InterviewFilters {
+  status?: InterviewStatus;
+  interview_type?: InterviewType;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface InterviewsResponse {
+  interviews: Interview[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface AvailableApplication {
+  id: number;
+  candidate?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  };
+  jobOffer?: {
+    id: number;
+    title: string;
+    company: string;
+  };
+  status: string;
+  applied_at: string;
+}
+
+export interface CreateInterviewRequest {
+  application_id: number;
+  scheduled_date: string;
+  duration_minutes?: number;
+  interview_type?: InterviewType;
+  location?: string;
+  meeting_link?: string;
+  notes?: string;
+}
+
+export interface UpdateInterviewRequest {
+  scheduled_date?: string;
+  duration_minutes?: number;
+  interview_type?: InterviewType;
+  location?: string;
+  meeting_link?: string;
+  status?: InterviewStatus;
+  notes?: string;
+  score?: number;
+  feedback?: string;
+  decision?: InterviewDecision;
 }

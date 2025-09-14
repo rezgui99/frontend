@@ -5,7 +5,6 @@ const {
   applyToJobOffer,
   getCandidateApplications,
   getApplicationById,
-  withdrawApplication
 } = require('../controllers/candidateApplication');
 
 // Toutes les routes nécessitent une authentification candidat
@@ -14,7 +13,6 @@ router.use(authenticateCandidateToken);
 router.post('/apply', applyToJobOffer);
 router.get('/', getCandidateApplications);
 router.get('/:id', getApplicationById);
-router.delete('/:id', withdrawApplication);
-
+// Note: withdrawApplication n'est pas implémenté dans le controller
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const db = require("../../models/index");
 const nodemailer = require('nodemailer');
-const { Interview, Application, Candidate, JobOffer, User, sequelize } = db;
+const { Interview, Application, Candidate, JobOffer, User, CandidateCV, sequelize } = db;
 
 // Configuration email
 const transporter = nodemailer.createTransport({
@@ -53,6 +53,11 @@ const getAllInterviews = async (req, res) => {
               model: JobOffer,
               as: 'jobOffer',
               attributes: ['id', 'title', 'company']
+            },
+            {
+              model: CandidateCV,
+              as: 'cv',
+              attributes: ['id', 'title', 'file_name', 'file_size', 'file_path']
             }
           ]
         },
@@ -243,6 +248,10 @@ const scheduleInterview = async (req, res) => {
         {
           model: JobOffer,
           as: 'jobOffer'
+        },
+        {
+          model: CandidateCV,
+          as: 'cv'
         }
       ],
       transaction: t
@@ -260,23 +269,52 @@ const scheduleInterview = async (req, res) => {
       return res.status(400).json({ error: 'La date d\'entretien doit être dans le futur' });
     }
 
-    // Générer un lien Meet si pas fourni
-    const finalMeetingLink = meeting_link || generateGoogleMeetLink();
+    // Générer un lien selon le type d'entretien
+    let finalMeetingLink = meeting_link;
+    let finalLocation = location;
+    
+    if (interview_type === 'video' && !meeting_link) {
+      finalMeetingLink = generateGoogleMeetLink();
+    }
+    
+    if (interview_type === 'in_person' && !location) {
+      finalLocation = 'Adresse à confirmer';
+    }
 
-    // Créer l'entretien
-    const interview = await Interview.create({
-      application_id,
-      interviewer_id: req.user.id,
-      scheduled_date: interviewDate,
-      duration_minutes,
-      interview_type,
-      location,
-      meeting_link: finalMeetingLink,
-      status: 'scheduled',
-      notes,
-      decision: 'pending',
-      reminder_sent: false
-    }, { transaction: t });
+    // Vérifier s'il existe déjà un entretien pour cette candidature
+    let interview = await Interview.findOne({
+      where: { application_id },
+      transaction: t
+    });
+
+    if (interview) {
+      // Mettre à jour l'entretien existant
+      await interview.update({
+        scheduled_date: interviewDate,
+        duration_minutes,
+        interview_type,
+        location: finalLocation,
+        meeting_link: finalMeetingLink,
+        status: 'confirmed',
+        notes: notes ? `${interview.notes || ''}\n\n[REPROGRAMMÉ] ${notes}` : interview.notes,
+        interviewer_id: req.user.id
+      }, { transaction: t });
+    } else {
+      // Créer un nouvel entretien
+      interview = await Interview.create({
+        application_id,
+        interviewer_id: req.user.id,
+        scheduled_date: interviewDate,
+        duration_minutes,
+        interview_type,
+        location: finalLocation,
+        meeting_link: finalMeetingLink,
+        status: 'confirmed',
+        notes,
+        decision: 'pending',
+        reminder_sent: false
+      }, { transaction: t });
+    }
 
     // Mettre à jour l'application
     await application.update({
@@ -285,8 +323,8 @@ const scheduleInterview = async (req, res) => {
       interview_link: finalMeetingLink
     }, { transaction: t });
 
-    // Envoyer email au candidat
-    await sendInterviewNotificationEmail(application, interview, 'scheduled');
+    // Envoyer email détaillé au candidat
+    await sendDetailedInterviewNotification(application, interview, req.user);
 
     await t.commit();
     res.status(201).json({
@@ -685,6 +723,82 @@ const generateGoogleMeetLink = () => {
   return `https://meet.google.com/${part1}-${part2}-${part3}`;
 };
 
+// Envoyer email détaillé de notification d'entretien
+const sendDetailedInterviewNotification = async (application, interview, recruiter) => {
+  try {
+    const candidate = application.candidate;
+    const jobOffer = application.jobOffer;
+    const interviewDate = new Date(interview.scheduled_date);
+    
+    if (!candidate || !jobOffer) return;
+
+    // Déterminer le mode d'entretien et les instructions spécifiques
+    const interviewModeInfo = getInterviewModeInfo(interview.interview_type, interview.meeting_link, interview.location);
+
+    const subject = `🎉 Entretien programmé - ${jobOffer.title}`;
+    const content = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #2196F3; text-align: center;">Entretien Programmé !</h1>
+        
+        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2>Félicitations ${candidate.firstName} ${candidate.lastName} !</h2>
+          <p>Votre candidature pour le poste de <strong>${jobOffer.title}</strong> chez <strong>${jobOffer.company}</strong> a retenu notre attention.</p>
+          <p>Nous avons programmé un entretien pour vous.</p>
+        </div>
+
+        <div style="background-color: #fff; border: 2px solid #2196F3; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #2196F3; margin-top: 0;">📅 Détails de l'entretien</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li style="margin: 10px 0;"><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</li>
+            <li style="margin: 10px 0;"><strong>⏱️ Durée :</strong> ${interview.duration_minutes} minutes</li>
+            <li style="margin: 10px 0;"><strong>🎯 Type :</strong> ${getInterviewTypeLabel(interview.interview_type)}</li>
+            <li style="margin: 10px 0;"><strong>👤 Recruteur :</strong> ${recruiter.firstName} ${recruiter.lastName}</li>
+            ${interviewModeInfo.details}
+          </ul>
+        </div>
+
+        ${interviewModeInfo.instructions}
+
+        <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
+          <ul style="color: #6b7280; font-size: 14px;">
+            ${interviewModeInfo.tips}
+            <li>Préparez vos questions sur l'entreprise et le poste</li>
+            <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
+            <li>Préparez des exemples concrets de vos réalisations</li>
+          </ul>
+        </div>
+
+        ${interview.notes ? `
+          <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #92400e; margin-top: 0;">📝 Notes du recruteur :</h4>
+            <p style="color: #78350f;">${interview.notes}</p>
+          </div>
+        ` : ''}
+
+        <div style="text-align: center; margin: 30px 0;">
+          <p style="color: #10b981; font-weight: bold;">🍀 Nous avons hâte de vous rencontrer !</p>
+          <p style="color: #6b7280; font-size: 12px;">
+            Si vous avez des questions ou besoin de reporter, contactez notre équipe RH à ${recruiter.email}.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: candidate.email,
+      subject,
+      html: content
+    });
+
+    console.log('✅ Detailed interview notification email sent to candidate');
+
+  } catch (emailError) {
+    console.error('❌ Error sending detailed interview notification:', emailError);
+  }
+};
+
 // Envoyer email de notification d'entretien
 const sendInterviewNotificationEmail = async (application, interview, status) => {
   try {
@@ -716,7 +830,7 @@ const sendInterviewNotificationEmail = async (application, interview, status) =>
                 <li style="margin: 10px 0;"><strong>📅 Date et heure :</strong> ${interviewDate.toLocaleString('fr-FR')}</li>
                 <li style="margin: 10px 0;"><strong>⏱️ Durée :</strong> ${interview.duration_minutes} minutes</li>
                 <li style="margin: 10px 0;"><strong>🎯 Type :</strong> ${getInterviewTypeLabel(interview.interview_type)}</li>
-                <li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${interview.meeting_link}" style="color: #2196F3; font-weight: bold;">${interview.meeting_link}</a></li>
+                ${interview.meeting_link ? `<li style="margin: 10px 0;"><strong>🔗 Lien de l'entretien :</strong> <a href="${interview.meeting_link}" style="color: #2196F3; font-weight: bold;">${interview.meeting_link}</a></li>` : ''}
                 ${interview.location ? `<li style="margin: 10px 0;"><strong>📍 Lieu :</strong> ${interview.location}</li>` : ''}
               </ul>
             </div>
@@ -724,10 +838,12 @@ const sendInterviewNotificationEmail = async (application, interview, status) =>
             <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <h4 style="color: #374151; margin-top: 0;">💡 Conseils pour votre entretien :</h4>
               <ul style="color: #6b7280; font-size: 14px;">
-                <li>Testez votre connexion et votre matériel 15 minutes avant</li>
+                ${interview.interview_type === 'video' ? '<li>Testez votre connexion et votre matériel 15 minutes avant</li>' : ''}
+                ${interview.interview_type === 'phone' ? '<li>Assurez-vous d\'être dans un endroit calme avec une bonne réception</li>' : ''}
+                ${interview.interview_type === 'in_person' ? '<li>Prévoyez d\'arriver 10 minutes en avance</li>' : ''}
                 <li>Préparez vos questions sur l'entreprise et le poste</li>
                 <li>Ayez votre CV et votre lettre de motivation sous les yeux</li>
-                <li>Trouvez un endroit calme et bien éclairé</li>
+                ${interview.interview_type === 'video' ? '<li>Trouvez un endroit calme et bien éclairé</li>' : ''}
                 <li>Préparez des exemples concrets de vos réalisations</li>
               </ul>
             </div>
@@ -1013,6 +1129,115 @@ const getInterviewTypeLabel = (type) => {
   return labels[type] || 'Entretien';
 };
 
+// Obtenir les informations détaillées du mode d'entretien
+const getInterviewModeInfo = (type, meetingLink, location) => {
+  switch (type) {
+    case 'video':
+      return {
+        label: '💻 Entretien vidéo (Google Meet)',
+        details: `<li style="margin: 10px 0;"><strong>🔗 Lien Google Meet :</strong> <a href="${meetingLink}" style="color: #2196F3; font-weight: bold; text-decoration: none;">${meetingLink}</a></li>`,
+        instructions: `
+          <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0288d1;">
+            <h4 style="color: #01579b; margin-top: 0;">💻 Instructions pour l'entretien vidéo :</h4>
+            <ul style="color: #0277bd; font-size: 14px;">
+              <li>Cliquez sur le lien Google Meet 5 minutes avant l'heure prévue</li>
+              <li>Assurez-vous d'avoir une connexion internet stable</li>
+              <li>Testez votre caméra et microphone à l'avance</li>
+              <li>Choisissez un endroit calme et bien éclairé</li>
+            </ul>
+          </div>
+        `,
+        tips: '<li>Testez votre connexion et votre matériel 15 minutes avant</li><li>Trouvez un endroit calme et bien éclairé</li><li>Regardez la caméra, pas l\'écran, pour maintenir le contact visuel</li>'
+      };
+
+    case 'phone':
+      return {
+        label: '📞 Entretien téléphonique',
+        details: `<li style="margin: 10px 0;"><strong>📞 Mode :</strong> Nous vous appellerons au numéro que vous avez fourni</li>`,
+        instructions: `
+          <div style="background-color: #f3e5f5; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #9c27b0;">
+            <h4 style="color: #6a1b9a; margin-top: 0;">📞 Instructions pour l'entretien téléphonique :</h4>
+            <ul style="color: #7b1fa2; font-size: 14px;">
+              <li>Assurez-vous d'être disponible à l'heure prévue</li>
+              <li>Trouvez un endroit calme avec une bonne réception</li>
+              <li>Ayez votre CV et vos notes à portée de main</li>
+              <li>Préparez un stylo et du papier pour prendre des notes</li>
+            </ul>
+          </div>
+        `,
+        tips: '<li>Assurez-vous d\'être dans un endroit calme avec une bonne réception</li><li>Ayez vos documents à portée de main</li><li>Parlez clairement et articulez bien</li>'
+      };
+
+    case 'in_person':
+      return {
+        label: '🏢 Entretien en présentiel',
+        details: `<li style="margin: 10px 0;"><strong>📍 Lieu :</strong> ${location || 'Adresse à confirmer'}</li>`,
+        instructions: `
+          <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50;">
+            <h4 style="color: #2e7d32; margin-top: 0;">🏢 Instructions pour l'entretien en présentiel :</h4>
+            <ul style="color: #388e3c; font-size: 14px;">
+              <li>Arrivez 10-15 minutes en avance</li>
+              <li>Apportez une copie papier de votre CV</li>
+              <li>Prévoyez les transports et le stationnement</li>
+              <li>Habillez-vous de manière professionnelle</li>
+            </ul>
+          </div>
+        `,
+        tips: '<li>Prévoyez d\'arriver 10 minutes en avance</li><li>Apportez une copie papier de votre CV</li><li>Habillez-vous de manière professionnelle</li>'
+      };
+
+    default:
+      return {
+        label: getInterviewTypeLabel(type),
+        details: '',
+        instructions: '',
+        tips: '<li>Préparez-vous selon le type d\'entretien</li>'
+      };
+  }
+};
+
+// Télécharger le CV d'un candidat depuis un entretien
+const downloadCVFromInterview = async (req, res) => {
+  try {
+    const { interview_id, cv_id } = req.params;
+    
+    // Vérifier que l'entretien existe et appartient au recruteur ou est accessible
+    const interview = await Interview.findByPk(interview_id, {
+      include: [{
+        model: Application,
+        as: 'application',
+        include: [{
+          model: CandidateCV,
+          as: 'cv'
+        }]
+      }]
+    });
+
+    if (!interview) {
+      return res.status(404).json({ error: 'Entretien non trouvé' });
+    }
+
+    const cv = interview.application.cv;
+    if (!cv || cv.id !== parseInt(cv_id)) {
+      return res.status(404).json({ error: 'CV non trouvé pour cet entretien' });
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '..', cv.file_path);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Fichier CV non trouvé sur le serveur' });
+    }
+
+    res.download(filePath, cv.file_name);
+
+  } catch (error) {
+    console.error('Error downloading CV from interview:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllInterviews,
   getInterviewStatistics,
@@ -1028,6 +1253,18 @@ module.exports = {
   sendInterviewConfirmationEmail,
   sendInterviewCancellationEmail,
   sendInterviewCompletionEmail,
-  generateGoogleMeetLink,
-  getInterviewTypeLabel
+  generateGoogleMeetLink: generateGoogleMeetLinkExport,
+  getInterviewTypeLabel,
+  sendDetailedInterviewNotification,
+  getInterviewModeInfo,
+  downloadCVFromInterview
 };
+
+// Export de la fonction generateGoogleMeetLink pour utilisation externe
+function generateGoogleMeetLinkExport() {
+  const characters = 'abcdefghijklmnopqrstuvwxyz';
+  const part1 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  const part2 = Array.from({length: 4}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  const part3 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+  return `https://meet.google.com/${part1}-${part2}-${part3}`;
+}

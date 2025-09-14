@@ -124,4 +124,4 @@ export class CandidateJobOfferDetailComponent implements OnInit {
   formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString('fr-FR');
   }
-    }
+}

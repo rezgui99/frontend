@@ -63,10 +63,6 @@ export class CandidateService {
     return this.http.get<Application>(`${this.apiUrl}/candidate/applications/${id}`);
   }
 
-  withdrawApplication(id: number): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(`${this.apiUrl}/candidate/applications/${id}`);
-  }
-
   // === FAVORIS ===
   getFavorites(): Observable<CandidateFavorite[]> {
     return this.http.get<CandidateFavorite[]>(`${this.apiUrl}/candidate/favorites`);
@@ -112,5 +108,10 @@ export class CandidateService {
 
   getJobOfferStats(): Observable<any> {
     return this.http.get(`${this.apiUrl}/public/job-offers/stats`);
+  }
+
+  // Retirer une candidature (à implémenter côté backend si nécessaire)
+  withdrawApplication(applicationId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/candidate/applications/${applicationId}`);
   }
 }

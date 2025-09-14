@@ -79,10 +79,10 @@ app.use("/api/candidate/cvs", candidateCVRoutes);
 app.use("/api/candidate/applications", candidateApplicationRoutes);
 app.use("/api/candidate/favorites", candidateFavoritesRoutes);
 app.use("/api/public/job-offers", publicJobOffersRoutes);
-app.use("/api/recruiter/applications", authenticateToken, recruiterApplicationsRoutes);
+app.use("/api/recruiter/applications", recruiterApplicationsRoutes);
 
 // Routes entretiens
-app.use("/api/interviews", interviewRoutes);
+app.use("/api/interviews", authenticateToken, interviewRoutes);
 
 // 404 - Route non trouvée
 app.use((req, res, next) => {

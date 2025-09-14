@@ -29,9 +29,6 @@ export class CandidateApplyComponent implements OnInit {
   submitting = false;
   errorMessage: string | null = null;
   successMessage: string | null = null;
-  
-  // Interview slots
-  interviewSlots: string[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -41,11 +38,8 @@ export class CandidateApplyComponent implements OnInit {
     private formBuilder: FormBuilder
   ) {
     this.applicationForm = this.formBuilder.group({
-      cv_id: ['', Validators.required],
-      cover_letter: ['', [Validators.required, Validators.minLength(50)]],
-      interview_slot_1: [''],
-      interview_slot_2: [''],
-      interview_slot_3: ['']
+      cv_id: [null, Validators.required],
+      cover_letter: ['', [Validators.required, Validators.minLength(50)]]
     });
   }
 
@@ -122,18 +116,6 @@ ${this.currentCandidate.firstName} ${this.currentCandidate.lastName}`;
     this.applicationForm.patchValue({ cover_letter: coverLetter });
   }
 
-  addInterviewSlot(): void {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    
-    const slot = tomorrow.toISOString().slice(0, 16);
-    this.interviewSlots.push(slot);
-  }
-
-  removeInterviewSlot(index: number): void {
-    this.interviewSlots.splice(index, 1);
-  }
 
   onSubmit(): void {
     if (!this.applicationForm.valid || !this.jobOffer) {
@@ -144,33 +126,39 @@ ${this.currentCandidate.firstName} ${this.currentCandidate.lastName}`;
     this.submitting = true;
     this.errorMessage = null;
 
-    // Préparer les créneaux d'entretien
-    const proposedSlots = [
-      this.applicationForm.value.interview_slot_1,
-      this.applicationForm.value.interview_slot_2,
-      this.applicationForm.value.interview_slot_3
-    ].filter(slot => slot && slot.trim() !== '');
 
     const applicationData: JobApplicationRequest = {
       job_offer_id: this.jobOffer.id!,
       cv_id: this.applicationForm.value.cv_id ? parseInt(this.applicationForm.value.cv_id) : undefined,
-      cover_letter: this.applicationForm.value.cover_letter,
-      proposed_interview_slots: proposedSlots
+      cover_letter: this.applicationForm.value.cover_letter
     };
 
     console.log('📤 Sending application data:', applicationData);
     console.log('📄 CV ID:', applicationData.cv_id);
     console.log('✍️ Cover letter length:', applicationData.cover_letter?.length);
-    console.log('📅 Proposed slots:', applicationData.proposed_interview_slots);
+    
+    // Validation finale côté client
+    if (!applicationData.cv_id) {
+      this.errorMessage = 'Veuillez sélectionner un CV';
+      this.submitting = false;
+      return;
+    }
+    
+    if (!applicationData.cover_letter || applicationData.cover_letter.trim().length < 50) {
+      this.errorMessage = 'La lettre de motivation doit contenir au moins 50 caractères';
+      this.submitting = false;
+      return;
+    }
+    
     this.candidateService.applyToJobOffer(applicationData).subscribe({
       next: (response) => {
         console.log('✅ Application submitted successfully:', response);
         this.successMessage = response.message;
         
-        // Rediriger vers les candidatures après 2 secondes
+        // Rediriger vers les candidatures après 3 secondes pour laisser le temps de lire le message
         setTimeout(() => {
           this.router.navigate(['/candidate/applications']);
-        }, 2000);
+        }, 3000);
       },
       error: (error) => {
         console.error('Error applying to job offer:', error);

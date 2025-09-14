@@ -13,7 +13,8 @@ const {
   completeInterview,
   rescheduleInterview,
   confirmInterview,            
-  sendInterviewConfirmation 
+  sendInterviewConfirmation,
+  downloadCVFromInterview
 } = require('../controllers/interviews');
 
 // Middleware de logging pour debug
@@ -54,5 +55,8 @@ router.patch('/:id/cancel', auditAction('UPDATE', 'Interviews'), cancelInterview
 
 // Route pour envoyer une confirmation manuelle
 router.post('/:id/send-confirmation', auditAction('NOTIFY', 'Interviews'), sendInterviewConfirmation);
+
+// Route pour télécharger le CV depuis un entretien
+router.get('/:interview_id/cv/:cv_id/download', downloadCVFromInterview);
 
 module.exports = router;

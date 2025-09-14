@@ -52,7 +52,7 @@ module.exports = (sequelize, DataTypes) => {
         }
       },
       interview_type: {
-        type: DataTypes.ENUM('phone', 'video', 'in_person', 'technical', 'hr', 'final'),
+        type: DataTypes.ENUM('phone', 'video', 'in_person'),
         allowNull: false,
         defaultValue: 'video'
       },
@@ -67,10 +67,14 @@ module.exports = (sequelize, DataTypes) => {
           isUrl: true
         }
       },
+      contact_phone: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
       status: {
-        type: DataTypes.ENUM('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rescheduled'),
+        type: DataTypes.ENUM('draft', 'scheduled', 'completed', 'canceled'),
         allowNull: false,
-        defaultValue: 'scheduled'
+        defaultValue: 'draft'
       },
       notes: {
         type: DataTypes.TEXT,
@@ -92,6 +96,19 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('pending', 'pass', 'fail', 'on_hold'),
         allowNull: false,
         defaultValue: 'pending'
+      },
+      timezone: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: 'Europe/Paris'
+      },
+      starts_at_utc: {
+        type: DataTypes.DATE,
+        allowNull: false
+      },
+      ends_at_utc: {
+        type: DataTypes.DATE,
+        allowNull: false
       },
       reminder_sent: {
         type: DataTypes.BOOLEAN,

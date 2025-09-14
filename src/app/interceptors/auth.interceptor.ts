@@ -43,8 +43,16 @@ export class AuthInterceptor implements HttpInterceptor {
       
       return next.handle(cloned).pipe(
         catchError((error: HttpErrorResponse) => {
-          console.error('❌ AuthInterceptor - HTTP Error:', error.status, error.message);
-          console.error('❌ AuthInterceptor - Error details:', error.error);
+          console.group('❌ AuthInterceptor - HTTP Error Details');
+          console.error('Status:', error.status);
+          console.error('Status Text:', error.statusText);
+          console.error('URL:', req.url);
+          console.error('Method:', req.method);
+          console.error('Error Message:', error.message);
+          console.error('Error Body:', error.error);
+          console.error('Headers:', error.headers);
+          console.groupEnd();
+          
           if (error.status === 401) {
             console.error('User token expired or invalid, logging out...');
             this.authService.forceLogout();

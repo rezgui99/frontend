@@ -1,7 +1,19 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { InterviewService, Interview, InterviewFilters, InterviewStatistics } from '../../../services/interview.service';
+import { InterviewService } from '../../../services/interview.service';
+import { RecruiterApplicationsService } from '../../../services/recruiter-applications.service';
+import { 
+  Interview, 
+  InterviewFilters, 
+  InterviewStatistics, 
+  CreateInterviewRequest,
+  InterviewsResponse,
+  AvailableApplication,
+  InterviewType,
+  InterviewStatus,
+  InterviewDecision
+} from '../../../models/candidate.model';
 
 @Component({
   selector: 'app-recruiter-interviews',
@@ -12,14 +24,7 @@ import { InterviewService, Interview, InterviewFilters, InterviewStatistics } fr
 })
 export class RecruiterInterviewsComponent implements OnInit {
   interviews: Interview[] = [];
-  statistics: InterviewStatistics = {
-    total_interviews: 0,
-    upcoming_interviews: 0,
-    status_breakdown: {} as any,
-    type_breakdown: {} as any,
-    interviewer_breakdown: [],
-    average_score: null
-  };
+  statistics: InterviewStatistics | null = null;
   
   loading = false;
   scheduling = false;
@@ -40,12 +45,19 @@ export class RecruiterInterviewsComponent implements OnInit {
   showScheduleModal = false;
   scheduleForm: FormGroup;
   
-  // Nouveaux modals pour les documents
+  // Modals pour les documents
   showInterviewCoverLetterModal = false;
+  showInterviewDetailsModal = false;
   selectedInterviewForCoverLetter: Interview | null = null;
+  selectedInterviewDetails: Interview | null = null;
+  selectedApplicationForSchedule: AvailableApplication | null = null;
 
+  // Applications disponibles pour programmer des entretiens
+  availableApplications: AvailableApplication[] = [];
+  loadingApplications = false;
+  
   // Options
-  statusOptions = [
+  statusOptions: { value: InterviewStatus; label: string }[] = [
     { value: 'scheduled', label: 'Programmé' },
     { value: 'confirmed', label: 'Confirmé' },
     { value: 'in_progress', label: 'En cours' },
@@ -54,7 +66,7 @@ export class RecruiterInterviewsComponent implements OnInit {
     { value: 'rescheduled', label: 'Reprogrammé' }
   ];
 
-  typeOptions = [
+  typeOptions: { value: InterviewType; label: string }[] = [
     { value: 'phone', label: 'Téléphonique' },
     { value: 'video', label: 'Vidéo' },
     { value: 'in_person', label: 'En personne' },
@@ -63,10 +75,11 @@ export class RecruiterInterviewsComponent implements OnInit {
     { value: 'final', label: 'Final' }
   ];
 
-  interviewTypeLabels: any = {};
+  interviewTypeLabels: { [key: string]: string } = {};
 
   constructor(
     private interviewService: InterviewService,
+    private recruiterApplicationsService: RecruiterApplicationsService,
     private formBuilder: FormBuilder
   ) {
     this.scheduleForm = this.formBuilder.group({
@@ -90,83 +103,84 @@ export class RecruiterInterviewsComponent implements OnInit {
     this.loading = true;
     
     this.interviewService.getInterviews(this.filters).subscribe({
-      next: (response) => {
-        this.interviews = response.interviews || [];
-        this.pagination = response.pagination || {
-          total: 0,
-          page: 1,
-          limit: 20,
-          totalPages: 0
-        };
+      next: (response: InterviewsResponse | Interview[]) => {
+        if (Array.isArray(response)) {
+          this.interviews = response;
+          this.pagination = {
+            total: response.length,
+            page: 1,
+            limit: response.length,
+            totalPages: 1
+          };
+        } else {
+          this.interviews = response.interviews || [];
+          this.pagination = response.pagination || {
+            total: 0,
+            page: 1,
+            limit: 20,
+            totalPages: 0
+          };
+        }
         this.loading = false;
       },
       error: (error) => {
         console.error('Error loading interviews:', error);
-        this.interviews = this.getMockInterviews();
-        this.pagination = {
-          total: this.interviews.length,
-          page: 1,
-          limit: 20,
-          totalPages: 1
-        };
+        this.interviews = [];
         this.loading = false;
       }
     });
   }
 
-  getMockInterviews(): Interview[] {
-    return [
-      {
-        id: 1,
-        application_id: 1,
-        interviewer_id: 1,
-        scheduled_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        duration_minutes: 60,
-        interview_type: 'video',
-        status: 'scheduled',
-        meeting_link: 'https://meet.google.com/abc-defg-hij',
-        notes: 'Entretien technique avec focus sur React/Node.js',
-        decision: 'pending',
-        reminder_sent: false,
-        application: {
-          candidate: {
-            firstName: 'Jean',
-            lastName: 'Dupont',
-            email: 'jean.dupont@email.com',
-            phone: '+33 1 23 45 67 89'
-          },
-          jobOffer: {
-            title: 'Développeur Full Stack',
-            company: 'TechCorp'
-          }
-        },
-        interviewer: {
-          firstName: 'Marie',
-          lastName: 'Martin',
-          email: 'marie.martin@company.com'
-        }
-      }
-    ];
-  }
-
   loadStatistics(): void {
     this.interviewService.getStatistics().subscribe({
-      next: (stats) => {
+      next: (stats: InterviewStatistics) => {
         this.statistics = stats;
       },
       error: (error) => {
         console.error('Error loading statistics:', error);
+        this.statistics = {
+          total_interviews: 0,
+          upcoming_interviews: 0,
+          status_breakdown: {} as { [key in InterviewStatus]: number },
+          type_breakdown: {} as { [key in InterviewType]: number },
+          interviewer_breakdown: [],
+          average_score: null
+        };
       }
     });
   }
 
   loadInterviewTypeLabels(): void {
     this.interviewService.getInterviewTypeLabels().subscribe({
-      next: (labels) => {
+      next: (labels: { [key: string]: string }) => {
         this.interviewTypeLabels = labels;
       },
       error: (error) => {
         console.error('Error loading interview type labels:', error);
+        this.interviewTypeLabels = {
+          phone: 'Téléphonique',
+          video: 'Vidéo',
+          in_person: 'En personne',
+          technical: 'Technique',
+          hr: 'RH',
+          final: 'Final'
+        };
+      }
+    });
+  }
+
+  loadAvailableApplications(): void {
+    this.loadingApplications = true;
+    
+    this.recruiterApplicationsService.getAvailableApplicationsForInterview().subscribe({
+      next: (applications: AvailableApplication[]) => {
+        this.availableApplications = applications || [];
+        this.loadingApplications = false;
+      },
+      error: (error) => {
+        console.error('Error loading available applications:', error);
+        this.availableApplications = [];
+        this.loadingApplications = false;
       }
     });
   }
@@ -199,20 +213,22 @@ export class RecruiterInterviewsComponent implements OnInit {
     return Math.min(this.pagination.page * this.pagination.limit, this.pagination.total);
   }
 
-  // Modal methods
-  closeScheduleModal(): void {
-    this.showScheduleModal = false;
-    this.scheduleForm.reset({
-      duration_minutes: 60,
-      interview_type: 'video'
-    });
+  onApplicationSelect(): void {
+    const applicationId = this.scheduleForm.get('application_id')?.value;
+    if (applicationId) {
+      this.selectedApplicationForSchedule = this.availableApplications.find(
+        app => app.id === parseInt(applicationId)
+      ) || null;
+    }
   }
 
   onScheduleSubmit(): void {
     if (this.scheduleForm.valid) {
       this.scheduling = true;
       
-      this.interviewService.scheduleInterview(this.scheduleForm.value).subscribe({
+      const interviewData: CreateInterviewRequest = this.scheduleForm.value;
+      
+      this.interviewService.scheduleInterview(interviewData).subscribe({
         next: () => {
           this.closeScheduleModal();
           this.loadInterviews();
@@ -227,9 +243,40 @@ export class RecruiterInterviewsComponent implements OnInit {
     }
   }
 
+  onInterviewTypeChange(): void {
+    const interviewType = this.scheduleForm.get('interview_type')?.value;
+    
+    // Réinitialiser les champs selon le type
+    if (interviewType === 'phone') {
+      this.scheduleForm.patchValue({
+        location: '',
+        meeting_link: ''
+      });
+    } else if (interviewType === 'in_person') {
+      this.scheduleForm.patchValue({
+        meeting_link: ''
+      });
+    } else if (interviewType === 'video') {
+      this.scheduleForm.patchValue({
+        location: ''
+      });
+    }
+  }
+
+  closeScheduleModal(): void {
+    this.showScheduleModal = false;
+    this.selectedApplicationForSchedule = null;
+    this.scheduleForm.reset({
+      duration_minutes: 60,
+      interview_type: 'video'
+    });
+  }
+
   // Interview actions
   confirmInterview(interview: Interview): void {
-    this.interviewService.updateInterview(interview.id!, { status: 'confirmed' }).subscribe({
+    if (!interview.id) return;
+    
+    this.interviewService.updateInterview(interview.id, { status: 'confirmed' }).subscribe({
       next: () => {
         this.loadInterviews();
       },
@@ -240,9 +287,11 @@ export class RecruiterInterviewsComponent implements OnInit {
   }
 
   cancelInterview(interview: Interview): void {
+    if (!interview.id) return;
+    
     const reason = prompt('Raison de l\'annulation:');
     if (reason) {
-      this.interviewService.cancelInterview(interview.id!, reason).subscribe({
+      this.interviewService.cancelInterview(interview.id, reason).subscribe({
         next: () => {
           this.loadInterviews();
           this.loadStatistics();
@@ -255,11 +304,13 @@ export class RecruiterInterviewsComponent implements OnInit {
   }
 
   showRescheduleModal(interview: Interview): void {
+    if (!interview.id) return;
+    
     const newDate = prompt('Nouvelle date et heure (YYYY-MM-DD HH:MM):');
     const reason = prompt('Raison de la reprogrammation:');
     
     if (newDate && reason) {
-      this.interviewService.rescheduleInterview(interview.id!, {
+      this.interviewService.rescheduleInterview(interview.id, {
         new_scheduled_date: newDate,
         reason
       }).subscribe({
@@ -274,12 +325,14 @@ export class RecruiterInterviewsComponent implements OnInit {
   }
 
   showCompleteModal(interview: Interview): void {
+    if (!interview.id) return;
+    
     const score = prompt('Score de l\'entretien (0-100):');
     const feedback = prompt('Feedback pour le candidat:');
     const decision = confirm('Candidat retenu ?') ? 'pass' : 'fail';
     
     if (score && feedback) {
-      this.interviewService.completeInterview(interview.id!, {
+      this.interviewService.completeInterview(interview.id, {
         score: parseInt(score),
         feedback,
         decision
@@ -295,28 +348,51 @@ export class RecruiterInterviewsComponent implements OnInit {
     }
   }
 
-  sendConfirmationEmail(interview: Interview): void {
-    if (confirm('Envoyer un email de confirmation au candidat ?')) {
-      this.interviewService.sendInterviewConfirmation(interview.id!).subscribe({
-        next: () => {
-          alert('Email de confirmation envoyé avec succès');
-        },
-        error: (error) => {
-          console.error('Error sending confirmation email:', error);
-          alert('Erreur lors de l\'envoi de l\'email');
-        }
-      });
-    }
+  showEditModal(interview: Interview): void {
+    console.log('Edit interview:', interview);
+    // TODO: Implémenter modal d'édition complet
   }
 
-  showEditModal(interview: Interview): void {
-    // TODO: Implémenter modal d'édition complet
-    console.log('Edit interview:', interview);
+  // Document methods
+  showCoverLetterForInterview(interview: Interview): void {
+    this.selectedInterviewForCoverLetter = interview;
+    this.showInterviewCoverLetterModal = true;
+  }
+
+  closeInterviewCoverLetterModal(): void {
+    this.showInterviewCoverLetterModal = false;
+    this.selectedInterviewForCoverLetter = null;
+  }
+
+  viewInterviewDetails(interview: Interview): void {
+    this.selectedInterviewDetails = interview;
+    this.showInterviewDetailsModal = true;
+  }
+
+  closeInterviewDetailsModal(): void {
+    this.showInterviewDetailsModal = false;
+    this.selectedInterviewDetails = null;
+  }
+
+  downloadCVFromInterview(interviewId: number, cvId: number): void {
+    this.interviewService.downloadCVFromInterview(interviewId, cvId).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `cv-candidat-${cvId}.pdf`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (error) => {
+        console.error('Error downloading CV:', error);
+      }
+    });
   }
 
   // Utility methods
   getStatusClass(status: string): string {
-    const classes = {
+    const classes: { [key: string]: string } = {
       'scheduled': 'bg-blue-100 text-blue-800',
       'confirmed': 'bg-green-100 text-green-800',
       'in_progress': 'bg-yellow-100 text-yellow-800',
@@ -324,11 +400,11 @@ export class RecruiterInterviewsComponent implements OnInit {
       'cancelled': 'bg-red-100 text-red-800',
       'rescheduled': 'bg-orange-100 text-orange-800'
     };
-    return classes[status as keyof typeof classes] || 'bg-gray-100 text-gray-800';
+    return classes[status] || 'bg-gray-100 text-gray-800';
   }
 
   getStatusLabel(status: string): string {
-    const labels = {
+    const labels: { [key: string]: string } = {
       'scheduled': 'Programmé',
       'confirmed': 'Confirmé',
       'in_progress': 'En cours',
@@ -336,7 +412,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       'cancelled': 'Annulé',
       'rescheduled': 'Reprogrammé'
     };
-    return labels[status as keyof typeof labels] || status;
+    return labels[status] || status;
   }
 
   getTypeLabel(type: string): string {
@@ -349,8 +425,30 @@ export class RecruiterInterviewsComponent implements OnInit {
     return 'text-red-600';
   }
 
-  formatDateTime(dateString: string): string {
-    return new Date(dateString).toLocaleString('fr-FR');
+  formatDate(dateString?: string): string {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString('fr-FR');
+    } catch {
+      return '';
+    }
+  }
+
+  formatDateTime(dateString?: string): string {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleString('fr-FR');
+    } catch {
+      return '';
+    }
+  }
+
+  formatFileSize(size?: number): string {
+    if (!size || size === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(size) / Math.log(k));
+    return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   getMinDateTime(): string {
@@ -360,21 +458,45 @@ export class RecruiterInterviewsComponent implements OnInit {
     return tomorrow.toISOString().slice(0, 16);
   }
 
-  // Télécharger CV depuis un entretien
-  downloadCVFromInterview(interviewId: number, cvId: number): void {
-    window.open(`http://localhost:3000/api/interviews/${interviewId}/cv/${cvId}/download`, '_blank');
+  getInterviewTypeLabel(type: string): string {
+    const labels: { [key: string]: string } = {
+      'phone': 'Téléphonique',
+      'video': 'Vidéo',
+      'in_person': 'En personne',
+      'technical': 'Technique',
+      'hr': 'RH',
+      'final': 'Final'
+    };
+    return labels[type] || type;
   }
 
-  // Voir la lettre de motivation depuis un entretien
-  showCoverLetterForInterview(interview: Interview): void {
-    this.selectedInterviewForCoverLetter = interview;
-    this.showInterviewCoverLetterModal = true;
+  // Getters pour les statistiques avec protection null
+  get totalInterviews(): number {
+    return this.statistics?.total_interviews || 0;
   }
 
-  closeInterviewCoverLetterModal(): void {
-    this.showInterviewCoverLetterModal = false;
-    this.selectedInterviewForCoverLetter = null;
+  get upcomingInterviews(): number {
+    return this.statistics?.upcoming_interviews || 0;
   }
 
+  get statusBreakdown(): { [key in InterviewStatus]: number } {
+    return this.statistics?.status_breakdown || {} as { [key in InterviewStatus]: number };
+  }
 
+  get typeBreakdown(): { [key in InterviewType]: number } {
+    return this.statistics?.type_breakdown || {} as { [key in InterviewType]: number };
+  }
+
+  get averageScore(): number {
+    return this.statistics?.average_score || 0;
+  }
+
+  // Méthodes pour accéder aux statistiques de manière sécurisée
+  getStatusCount(status: InterviewStatus): number {
+    return this.statusBreakdown[status] || 0;
+  }
+
+  getTypeCount(type: InterviewType): number {
+    return this.typeBreakdown[type] || 0;
+  }
 }
