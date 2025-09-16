@@ -17,14 +17,14 @@
         <div class="text-xs text-gray-600 mt-1">
           <strong>Rôle principal:</strong> 
           <span [class]="currentUser.role === 'admin' ? 'text-red-600 font-bold' : 'text-blue-600 font-bold'">
-            {{ currentUser.role.toUpperCase() }}
+            {{ (currentUser.role || '') | uppercase }}
           </span>
         </div>
         <div class="flex flex-wrap gap-1 mt-1">
           <span *ngFor="let role of currentUser.roles" 
                 class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
                 [class]="role === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'">
-            {{ role }}
+            {{ role || '' }}
           </span>
         </div>
       </div>
@@ -82,13 +82,6 @@
           Analytics Avancées
         </a>
       </li>
-      <li class="mb-2">
-        <a routerLink="/gpec-alerts" routerLinkActive="active" class="nav-link">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-          🚨 Alertes GPEC
-        </a>
-      </li>
-     
       <li class="mb-2">
         <a routerLink="/recruiter/interviews" routerLinkActive="active" class="nav-link">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0h6m-6 0l-1 1m7-1l1 1m-6 0v6a2 2 0 002 2h2a2 2 0 002-2v-6"></path></svg>

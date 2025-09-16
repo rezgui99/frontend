@@ -45,7 +45,7 @@ export class CandidateApplicationsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading applications:', error);
-        this.errorMessage = 'Erreur lors du chargement de vos candidatures';
+        this.errorMessage = error.message || 'Erreur lors du chargement de vos candidatures';
         this.loading = false;
       }
     });
@@ -93,7 +93,7 @@ export class CandidateApplicationsComponent implements OnInit {
         },
         error: (error) => {
           console.error('Error withdrawing application:', error);
-          this.errorMessage = 'Erreur lors du retrait de la candidature';
+          this.errorMessage = error.message || 'Erreur lors du retrait de la candidature';
         }
       });
     }
@@ -144,5 +144,11 @@ export class CandidateApplicationsComponent implements OnInit {
 
   safeGetCVTitle(application: Application): string {
     return application?.cv?.title || application?.CandidateCV?.title || '';
+  }
+
+  // Méthode pour obtenir le titre du CV (alias pour compatibilité)
+  getCVTitle(application?: Application): string {
+    if (!application) return 'CV non spécifié';
+    return application?.cv?.title ?? application?.CandidateCV?.title ?? 'CV';
   }
 }

@@ -76,6 +76,7 @@ export class RecruiterInterviewsComponent implements OnInit {
   ];
 
   interviewTypeLabels: { [key: string]: string } = {};
+  errorMessage: any;
 
   constructor(
     private interviewService: InterviewService,
@@ -125,6 +126,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading interviews:', error);
+        this.errorMessage = error.message || 'Erreur lors du chargement des entretiens';
         this.interviews = [];
         this.loading = false;
       }
@@ -138,6 +140,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading statistics:', error);
+        this.errorMessage = error.message || 'Erreur lors du chargement des statistiques';
         this.statistics = {
           total_interviews: 0,
           upcoming_interviews: 0,
@@ -157,6 +160,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading interview type labels:', error);
+        this.errorMessage = error.message || 'Erreur lors du chargement des types d\'entretien';
         this.interviewTypeLabels = {
           phone: 'Téléphonique',
           video: 'Vidéo',
@@ -179,6 +183,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading available applications:', error);
+        this.errorMessage = error.message || 'Erreur lors du chargement des candidatures disponibles';
         this.availableApplications = [];
         this.loadingApplications = false;
       }
@@ -237,6 +242,7 @@ export class RecruiterInterviewsComponent implements OnInit {
         },
         error: (error) => {
           console.error('Error scheduling interview:', error);
+          this.errorMessage = error.message || 'Erreur lors de la programmation de l\'entretien';
           this.scheduling = false;
         }
       });
@@ -282,6 +288,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error confirming interview:', error);
+        this.errorMessage = error.message || 'Erreur lors de la confirmation de l\'entretien';
       }
     });
   }
@@ -298,6 +305,7 @@ export class RecruiterInterviewsComponent implements OnInit {
         },
         error: (error) => {
           console.error('Error cancelling interview:', error);
+          this.errorMessage = error.message || 'Erreur lors de l\'annulation de l\'entretien';
         }
       });
     }
@@ -319,6 +327,7 @@ export class RecruiterInterviewsComponent implements OnInit {
         },
         error: (error) => {
           console.error('Error rescheduling interview:', error);
+          this.errorMessage = error.message || 'Erreur lors de la reprogrammation de l\'entretien';
         }
       });
     }
@@ -343,6 +352,7 @@ export class RecruiterInterviewsComponent implements OnInit {
         },
         error: (error) => {
           console.error('Error completing interview:', error);
+          this.errorMessage = error.message || 'Erreur lors de la finalisation de l\'entretien';
         }
       });
     }
@@ -386,6 +396,7 @@ export class RecruiterInterviewsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error downloading CV:', error);
+        this.errorMessage = error.message || 'Erreur lors du téléchargement du CV';
       }
     });
   }

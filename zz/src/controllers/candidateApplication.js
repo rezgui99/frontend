@@ -193,7 +193,7 @@ const applyToJobOffer = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error applying to job offer:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -253,6 +253,9 @@ const createAutomaticInterview = async (application, transaction) => {
       status: 'scheduled',
       decision: 'pending',
       reminder_sent: false,
+      timezone: 'Europe/Paris',
+      starts_at_utc: selectedDate,
+      ends_at_utc: new Date(selectedDate.getTime() + 60 * 60 * 1000), // +1 hour
       notes: `Entretien automatiquement programmé suite à la candidature du ${new Date().toLocaleDateString('fr-FR')}`
     }, { transaction });
 
@@ -482,6 +485,25 @@ const getCandidateApplications = async (req, res) => {
       whereConditions.status = status;
     }
 
+    const applications = await Application.findAll({
+      where: whereConditions,
+      include: [
+        {
+          model: JobOffer,
+          as: 'jobOffer',
+          include: [{
+            model: JobDescription,
+            as: 'jobDescription'
+          }]
+        },
+        {
+          model: CandidateCV,
+          as: 'cv'
+        }
+      ],
+      order: [['applied_at', 'DESC']]
+    });
+
     console.log('✅ Applications found:', applications.length);
     applications.forEach(app => {
       console.log(`- Application ${app.id}: ${app.jobOffer?.title}, CV: ${app.cv?.title}, Status: ${app.status}`);
@@ -509,7 +531,7 @@ const getCandidateApplications = async (req, res) => {
     res.json(applicationsWithInterviews);
   } catch (error) {
     console.error('Error getting candidate applications:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -566,7 +588,7 @@ const getApplicationById = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting application:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -580,7 +602,7 @@ const getCandidateCVs = async (req, res) => {
     res.json(cvs);
   } catch (error) {
     console.error('Error getting candidate CVs:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -621,7 +643,13 @@ const uploadCV = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error uploading CV:', error);
-    res.status(500).json({ error: error.message });
+    
+    // Supprimer le fichier en cas d'erreur
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -664,7 +692,12 @@ const updateCV = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error updating CV:', error);
-    res.status(500).json({ error: error.message });
+    
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -704,7 +737,7 @@ const deleteCV = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error deleting CV:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -741,7 +774,7 @@ const setPrimaryCV = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error setting primary CV:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -767,7 +800,7 @@ const downloadCV = async (req, res) => {
     res.download(cv.file_path, cv.file_name);
   } catch (error) {
     console.error('Error downloading CV:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 // Fonction pour envoyer email de notification au recruteur

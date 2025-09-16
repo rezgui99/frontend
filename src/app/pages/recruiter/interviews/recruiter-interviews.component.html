@@ -100,17 +100,25 @@
         
         <div class="flex justify-between items-start mb-4">
           <div class="flex-1">
-            <ng-container *ngIf="interview?.application as app">
+            <ng-container *ngIf="interview?.application">
               <h4 class="text-lg font-semibold text-gray-900">
-                {{ app?.candidate?.firstName || 'Prénom' }} {{ app?.candidate?.lastName || 'Nom' }}
+                {{ interview.application?.candidate?.firstName || 'Prénom' }} {{ interview.application?.candidate?.lastName || 'Nom' }}
               </h4>
-              <p class="text-sm text-gray-600">{{ app?.jobOffer?.title || 'Poste non spécifié' }}</p>
-              <p class="text-sm text-gray-500">{{ app?.jobOffer?.company || 'Entreprise non spécifiée' }}</p>
-              <p *ngIf="app?.candidate?.email && app.candidate.email.trim().length > 0" class="text-sm text-gray-500">
-                📧 {{ app.candidate.email }}
+              <p class="text-sm text-gray-600">{{ interview.application?.jobOffer?.title || 'Poste non spécifié' }}</p>
+              <p class="text-sm text-gray-500">{{ interview.application?.jobOffer?.company || 'Entreprise non spécifiée' }}</p>
+
+              <p
+                *ngIf="(interview.application?.candidate?.email?.trim()?.length ?? 0) > 0"
+                class="text-sm text-gray-500"
+              >
+                📧 {{ interview.application?.candidate?.email || '' }}
               </p>
-              <p *ngIf="app?.candidate?.phone && app.candidate.phone.trim().length > 0" class="text-sm text-gray-500">
-                📞 {{ app.candidate.phone }}
+
+              <p
+                *ngIf="(interview.application?.candidate?.phone?.trim()?.length ?? 0) > 0"
+                class="text-sm text-gray-500"
+              >
+                📞 {{ interview.application?.candidate?.phone || '' }}
               </p>
             </ng-container>
           </div>
@@ -132,39 +140,39 @@
             <p class="text-sm font-medium text-gray-700">⏱️ Durée</p>
             <p class="text-sm text-gray-900">{{ interview?.duration_minutes || 60 }} minutes</p>
           </div>
-          <div *ngIf="interview?.score && interview.score > 0">
+          <div *ngIf="(interview?.score ?? 0) > 0">
             <p class="text-sm font-medium text-gray-700">📊 Score</p>
-            <p class="text-sm font-bold" [class]="getScoreClass(interview.score)">{{ interview.score }}/100</p>
+            <p class="text-sm font-bold" [class]="getScoreClass(interview?.score ?? 0)">{{ interview?.score ?? 0 }}/100</p>
           </div>
         </div>
 
         <!-- Lien de réunion -->
-        <div *ngIf="interview?.meeting_link && interview.meeting_link.trim().length > 0" class="mb-4 p-3 bg-blue-50 rounded-lg">
+        <div *ngIf="(interview?.meeting_link?.trim()?.length ?? 0) > 0" class="mb-4 p-3 bg-blue-50 rounded-lg">
           <p class="text-sm font-medium text-blue-800 mb-1">🔗 Lien de l'entretien</p>
           <div *ngIf="interview?.interview_type === 'video'">
-            <a [href]="interview.meeting_link" target="_blank" 
+            <a [href]="interview?.meeting_link!" target="_blank" 
                class="text-sm text-blue-600 hover:text-blue-800 underline">
-              {{ interview.meeting_link }}
+              {{ interview?.meeting_link }}
             </a>
           </div>
           <div *ngIf="interview?.interview_type === 'phone'">
             <span class="text-sm text-blue-700">
-              📞 Appeler le candidat au : {{ interview.meeting_link }}
+              📞 Appeler le candidat au : {{ interview?.meeting_link }}
             </span>
           </div>
         </div>
 
         <!-- Lieu pour entretien présentiel -->
-        <div *ngIf="interview?.location && interview.location.trim().length > 0 && interview?.interview_type === 'in_person'" class="mb-4 p-3 bg-green-50 rounded-lg">
+        <div *ngIf="(interview?.location?.trim()?.length ?? 0) > 0 && interview?.interview_type === 'in_person'" class="mb-4 p-3 bg-green-50 rounded-lg">
           <p class="text-sm font-medium text-green-800 mb-1">📍 Lieu de l'entretien</p>
-          <p class="text-sm text-green-700">{{ interview.location }}</p>
+          <p class="text-sm text-green-700">{{ interview?.location }}</p>
         </div>
 
         <!-- Cover Letter Info -->
         <ng-container *ngIf="interview?.application as app">
-          <div *ngIf="app?.cover_letter && app.cover_letter.trim().length > 0" class="mb-4 p-3 bg-green-50 rounded-lg">
+          <div *ngIf="(app?.cover_letter?.trim()?.length ?? 0) > 0" class="mb-4 p-3 bg-green-50 rounded-lg">
             <p class="text-sm font-medium text-green-800 mb-1">✍️ Lettre de motivation</p>
-            <p class="text-sm text-green-700 line-clamp-3">{{ app.cover_letter }}</p>
+            <p class="text-sm text-green-700 line-clamp-3">{{ app?.cover_letter || '' }}</p>
             <button (click)="showCoverLetterForInterview(interview)" 
                     class="mt-2 text-green-600 hover:text-green-800 text-xs">
               📖 Lire la lettre complète
@@ -173,36 +181,37 @@
         </ng-container>
 
         <!-- CV Info -->
-        <ng-container *ngIf="interview?.application as app">
-          <ng-container *ngIf="app?.cv as cv">
-            <div *ngIf="cv?.title" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p class="text-sm font-medium text-blue-800 mb-1">📄 CV du candidat</p>
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm text-blue-700">{{ cv.title }}</p>
-                  <p class="text-xs text-blue-600">{{ cv?.file_name || 'Nom de fichier non disponible' }}</p>
-                  <p class="text-xs text-blue-500">{{ formatFileSize(cv?.file_size || 0) }}</p>
-                </div>
-                <button *ngIf="interview?.id && cv?.id" 
-                        (click)="downloadCVFromInterview(interview!.id!, cv!.id!)" 
+        <ng-container *ngIf="interview?.application?.cv as cv">
+          <div *ngIf="cv?.title" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p class="text-sm font-medium text-blue-800 mb-1">📄 CV du candidat</p>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-blue-700">{{ cv?.title }}</p>
+                <p class="text-xs text-blue-600">{{ cv?.file_name || 'Nom de fichier non disponible' }}</p>
+                <p class="text-xs text-blue-500">{{ formatFileSize(cv?.file_size ?? 0) }}</p>
+              </div>
+
+              <ng-container *ngIf="interview?.id as iid">
+                <button *ngIf="cv?.id" 
+                        (click)="downloadCVFromInterview(iid, cv.id!)" 
                         class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 bg-blue-100 rounded">
                   📥 Télécharger
                 </button>
-              </div>
+              </ng-container>
             </div>
-          </ng-container>
+          </div>
         </ng-container>
 
         <!-- Notes -->
-        <div *ngIf="interview?.notes && interview.notes.trim().length > 0" class="mb-4">
+        <div *ngIf="(interview?.notes?.trim()?.length ?? 0) > 0" class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">📝 Notes</p>
-          <p class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{{ interview.notes }}</p>
+          <p class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{{ interview?.notes }}</p>
         </div>
 
         <!-- Feedback -->
-        <div *ngIf="interview?.feedback && interview.feedback.trim().length > 0" class="mb-4">
+        <div *ngIf="(interview?.feedback?.trim()?.length ?? 0) > 0" class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">💬 Feedback</p>
-          <p class="text-sm text-gray-600 bg-yellow-50 p-3 rounded-lg">{{ interview.feedback }}</p>
+          <p class="text-sm text-gray-600 bg-yellow-50 p-3 rounded-lg">{{ interview?.feedback }}</p>
         </div>
 
         <!-- Actions -->
@@ -450,19 +459,19 @@
               <p><strong>Statut :</strong> {{ getStatusLabel(selectedInterviewDetails?.status || '') }}</p>
             </div>
             <div>
-              <p *ngIf="selectedInterviewDetails?.meeting_link && selectedInterviewDetails.meeting_link.trim().length > 0">
+              <p *ngIf="(selectedInterviewDetails?.meeting_link?.trim()?.length ?? 0) > 0">
                 <strong>Lien/Contact :</strong> 
-                <a [href]="selectedInterviewDetails.meeting_link" target="_blank" class="text-blue-600 underline">
-                  {{ selectedInterviewDetails.meeting_link }}
+                <a [href]="selectedInterviewDetails?.meeting_link!" target="_blank" class="text-blue-600 underline">
+                  {{ selectedInterviewDetails?.meeting_link }}
                 </a>
               </p>
-              <p *ngIf="selectedInterviewDetails?.location && selectedInterviewDetails.location.trim().length > 0">
-                <strong>Lieu :</strong> {{ selectedInterviewDetails.location }}
+              <p *ngIf="(selectedInterviewDetails?.location?.trim()?.length ?? 0) > 0">
+                <strong>Lieu :</strong> {{ selectedInterviewDetails?.location }}
               </p>
-              <p *ngIf="selectedInterviewDetails?.score && selectedInterviewDetails.score > 0">
+              <p *ngIf="(selectedInterviewDetails?.score ?? 0) > 0">
                 <strong>Score :</strong> 
-                <span [class]="getScoreClass(selectedInterviewDetails.score)">
-                  {{ selectedInterviewDetails.score }}/100
+                <span [class]="getScoreClass(selectedInterviewDetails?.score ?? 0)">
+                  {{ selectedInterviewDetails?.score ?? 0 }}/100
                 </span>
               </p>
             </div>
@@ -477,8 +486,8 @@
               <div>
                 <p><strong>Nom :</strong> {{ app?.candidate?.firstName || 'Prénom' }} {{ app?.candidate?.lastName || 'Nom' }}</p>
                 <p><strong>Email :</strong> {{ app?.candidate?.email || 'Email non disponible' }}</p>
-                <p *ngIf="app?.candidate?.phone && app.candidate.phone.trim().length > 0">
-                  <strong>Téléphone :</strong> {{ app.candidate.phone }}
+                <p *ngIf="(app?.candidate?.phone?.trim()?.length ?? 0) > 0">
+                  <strong>Téléphone :</strong> {{ app?.candidate?.phone }}
                 </p>
               </div>
               <div>
@@ -491,36 +500,37 @@
         </ng-container>
 
         <!-- CV -->
-        <ng-container *ngIf="selectedInterviewDetails?.application as app">
-          <ng-container *ngIf="app?.cv as scv">
-            <div *ngIf="scv?.title" class="bg-purple-50 p-4 rounded-lg">
-              <h4 class="font-semibold text-purple-800 mb-2">📄 CV du candidat</h4>
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium">{{ scv.title }}</p>
-                  <p class="text-sm text-gray-600">{{ scv?.file_name || 'Nom de fichier non disponible' }}</p>
-                  <p class="text-xs text-gray-500">
-                    {{ formatFileSize(scv?.file_size || 0) }} • 
-                    Uploadé le {{ formatDate(scv?.created_at || '') }}
-                  </p>
-                </div>
-                <button *ngIf="selectedInterviewDetails?.id && scv?.id"
-                        (click)="downloadCVFromInterview(selectedInterviewDetails!.id!, scv!.id!)" 
+        <ng-container *ngIf="selectedInterviewDetails?.application?.cv as scv">
+          <div *ngIf="scv?.title" class="bg-purple-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-purple-800 mb-2">📄 CV du candidat</h4>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium">{{ scv?.title }}</p>
+                <p class="text-sm text-gray-600">{{ scv?.file_name || 'Nom de fichier non disponible' }}</p>
+                <p class="text-xs text-gray-500">
+                  {{ formatFileSize(scv?.file_size ?? 0) }} • 
+                  Uploadé le {{ formatDate(scv?.created_at || '') }}
+                </p>
+              </div>
+
+              <ng-container *ngIf="selectedInterviewDetails?.id as detId">
+                <button *ngIf="scv?.id"
+                        (click)="downloadCVFromInterview(detId, scv.id!)" 
                         class="btn btn-primary">
                   📥 Télécharger CV
                 </button>
-              </div>
+              </ng-container>
             </div>
-          </ng-container>
+          </div>
         </ng-container>
 
         <!-- Lettre de motivation -->
-        <ng-container *ngIf="selectedInterviewDetails?.application as app">
-          <div *ngIf="app?.cover_letter && app.cover_letter.trim().length > 0" class="bg-yellow-50 p-4 rounded-lg">
+        <ng-container *ngIf="selectedInterviewDetails?.application as app2">
+          <div *ngIf="(app2?.cover_letter?.trim()?.length ?? 0) > 0" class="bg-yellow-50 p-4 rounded-lg">
             <h4 class="font-semibold text-yellow-800 mb-2">✍️ Lettre de motivation</h4>
             <div class="bg-white p-4 rounded border max-h-64 overflow-y-auto">
               <div class="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                {{ app.cover_letter }}
+                {{ app2?.cover_letter || '' }}
               </div>
             </div>
           </div>
@@ -528,14 +538,14 @@
 
         <!-- Notes et feedback -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div *ngIf="selectedInterviewDetails?.notes && selectedInterviewDetails.notes.trim().length > 0" class="bg-gray-50 p-4 rounded-lg">
+          <div *ngIf="(selectedInterviewDetails?.notes?.trim()?.length ?? 0) > 0" class="bg-gray-50 p-4 rounded-lg">
             <h4 class="font-semibold text-gray-900 mb-2">📝 Notes de l'entretien</h4>
-            <div class="whitespace-pre-wrap text-gray-700">{{ selectedInterviewDetails.notes }}</div>
+            <div class="whitespace-pre-wrap text-gray-700">{{ selectedInterviewDetails?.notes }}</div>
           </div>
 
-          <div *ngIf="selectedInterviewDetails?.feedback && selectedInterviewDetails.feedback.trim().length > 0" class="bg-orange-50 p-4 rounded-lg">
+          <div *ngIf="(selectedInterviewDetails?.feedback?.trim()?.length ?? 0) > 0" class="bg-orange-50 p-4 rounded-lg">
             <h4 class="font-semibold text-orange-800 mb-2">💬 Feedback</h4>
-            <div class="whitespace-pre-wrap text-orange-800">{{ selectedInterviewDetails.feedback }}</div>
+            <div class="whitespace-pre-wrap text-orange-800">{{ selectedInterviewDetails?.feedback }}</div>
           </div>
         </div>
       </div>

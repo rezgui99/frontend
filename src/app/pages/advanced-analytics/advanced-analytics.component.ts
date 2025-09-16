@@ -51,8 +51,7 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
   skillsDemand: SkillDemand[] = [];
   contractStats: ContractTypeStatistics[] = [];
   
-  // États d'interface
-  showExportMenu = false;
+ 
   
   // Subjects pour la gestion de la destruction
   private destroy$ = new Subject<void>();
@@ -88,13 +87,7 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
     this.setupFiltersDebounce();
   }
 
-  // Écouteur pour fermer le menu d'export en cliquant ailleurs
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: Event): void {
-    if (this.showExportMenu && this.exportMenuRef && !this.exportMenuRef.nativeElement.contains(event.target)) {
-      this.showExportMenu = false;
-    }
-  }
+
 
   ngOnInit(): void {
     this.loadDashboardData();
@@ -251,10 +244,7 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
     this.onFiltersChange();
   }
 
-  // === GESTION DU MENU D'EXPORT ===
-  toggleExportMenu(): void {
-    this.showExportMenu = !this.showExportMenu;
-  }
+
 
   // === CRÉATION DES GRAPHIQUES ===
   private attemptCreateCharts(): void {
@@ -620,29 +610,9 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
     }
   }
 
-  // === EXPORT ===
-  async exportData(format: 'csv' | 'excel' | 'json'): Promise<void> {
-    this.isExporting = true;
-    this.showExportMenu = false;
+  
     
-    try {
-      const blob = await this.analyticsService.exportAnalyticsReport({
-        format,
-        type: 'dashboard',
-        filters: this.filters
-      }).toPromise();
 
-      if (blob) {
-        const filename = `analytics-dashboard-${new Date().getTime()}.${format}`;
-        this.analyticsService.downloadBlob(blob, filename);
-      }
-    } catch (error) {
-      console.error('Erreur export:', error);
-      this.error = 'Erreur lors de l\'export des données';
-    } finally {
-      this.isExporting = false;
-    }
-  }
 
   // === GESTION DES GRAPHIQUES ===
   private destroyChart(chartKey: string): void {

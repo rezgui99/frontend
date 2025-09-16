@@ -67,6 +67,13 @@ const getAllInterviews = async (req, res) => {
           attributes: ['id', 'firstName', 'lastName', 'email']
         }
       ],
+      attributes: [
+        'id', 'application_id', 'interviewer_id', 'scheduled_date', 
+        'duration_minutes', 'interview_type', 'location', 'meeting_link', 
+        'status', 'notes', 'score', 'feedback', 'decision', 'reminder_sent',
+        'timezone', 'starts_at_utc', 'ends_at_utc', 'contact_phone',
+        'createdAt', 'updatedAt'
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['scheduled_date', 'ASC']]
@@ -84,7 +91,7 @@ const getAllInterviews = async (req, res) => {
 
   } catch (error) {
     console.error('Error getting interviews:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -152,7 +159,7 @@ const getInterviewStatistics = async (req, res) => {
 
   } catch (error) {
     console.error('Error getting interview statistics:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -219,7 +226,7 @@ const getUpcomingInterviews = async (req, res) => {
 
   } catch (error) {
     console.error('Error getting upcoming interviews:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -312,7 +319,10 @@ const scheduleInterview = async (req, res) => {
         status: 'confirmed',
         notes,
         decision: 'pending',
-        reminder_sent: false
+        reminder_sent: false,
+        timezone: 'Europe/Paris',
+        starts_at_utc: interviewDate,
+        ends_at_utc: new Date(interviewDate.getTime() + (duration_minutes || 60) * 60 * 1000)
       }, { transaction: t });
     }
 
@@ -335,7 +345,7 @@ const scheduleInterview = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error scheduling interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -410,7 +420,7 @@ const updateInterview = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error updating interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -465,7 +475,7 @@ const confirmInterview = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error confirming interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -521,7 +531,7 @@ const cancelInterview = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error cancelling interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -583,7 +593,7 @@ const completeInterview = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error completing interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -644,7 +654,7 @@ const rescheduleInterview = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Error rescheduling interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -674,7 +684,7 @@ const sendInterviewConfirmation = async (req, res) => {
 
   } catch (error) {
     console.error('Error sending interview confirmation:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -1234,7 +1244,7 @@ const downloadCVFromInterview = async (req, res) => {
 
   } catch (error) {
     console.error('Error downloading CV from interview:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 

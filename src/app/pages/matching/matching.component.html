@@ -42,26 +42,7 @@
   <div *ngIf="matchingResults.length > 0" class="mt-8">
     <h3 class="text-2xl font-bold text-primary mb-4">Résultats du Matching</h3>
     
-    <!-- Prédictions de succès -->
-    <div *ngIf="successPredictions.length > 0" class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
-      <h4 class="text-lg font-semibold text-purple-800 mb-3">🔮 Prédictions de Succès</h4>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div *ngFor="let prediction of successPredictions" class="bg-white p-3 rounded-lg border">
-          <div class="flex justify-between items-center mb-2">
-            <span class="font-medium text-gray-900">{{ getEmployeeNameFromPrediction(prediction) }}</span>
-            <span class="text-lg font-bold" [ngClass]="getPredictionClass(prediction.success_probability)">
-              {{ prediction.success_probability }}%
-            </span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" [ngClass]="getConfidenceClass(prediction.confidence_level)">
-              {{ getConfidenceLabel(prediction.confidence_level) }}
-            </span>
-            <span class="text-xs text-gray-500">Score entretien: {{ prediction.estimated_interview_score }}%</span>
-          </div>
-        </div>
-      </div>
-    </div>
+   
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div *ngFor="let result of matchingResults" class="card">

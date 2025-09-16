@@ -21,6 +21,9 @@ interface JobOfferServiceResponse {
   styleUrls: ['./recruiter-applications.component.css']
 })
 export class RecruiterApplicationsComponent implements OnInit {
+getInterviewTypeLabel(arg0: string) {
+throw new Error('Method not implemented.');
+}
   applications: Application[] = [];
   jobOffers: JobOffer[] = [];
   loading = false;

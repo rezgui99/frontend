@@ -112,6 +112,8 @@ export class InterviewService {
     } else if (error.status === 404) {
       errorMessage = 'Ressource non trouvée.';
     } else if (error.status === 500) {
+      errorMessage = 'Erreur serveur interne. Veuillez réessayer dans quelques instants.';
+    } else if (error.status === 500) {
       errorMessage = 'Erreur serveur interne. Vérifiez les logs du backend.';
     } else if (error.error?.message) {
       errorMessage = error.error.message;

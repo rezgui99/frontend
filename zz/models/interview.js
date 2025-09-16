@@ -113,6 +113,19 @@ module.exports = (sequelize, DataTypes) => {
       reminder_sent: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+      },
+      timezone: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: 'Europe/Paris'
+      },
+      starts_at_utc: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      ends_at_utc: {
+        type: DataTypes.DATE,
+        allowNull: true
       }
     },
     {
@@ -120,8 +133,28 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "Interview",
       tableName: "Interviews",
       hooks: {
-        // Hooks supprimés - la logique est maintenant dans les contrôleurs
-        // pour un meilleur contrôle et éviter les effets de bord
+        beforeCreate: async (interview) => {
+          // Calculer les heures UTC si pas définies
+          if (interview.scheduled_date && !interview.starts_at_utc) {
+            interview.starts_at_utc = new Date(interview.scheduled_date);
+          }
+          if (interview.scheduled_date && interview.duration_minutes && !interview.ends_at_utc) {
+            const endTime = new Date(interview.scheduled_date);
+            endTime.setMinutes(endTime.getMinutes() + interview.duration_minutes);
+            interview.ends_at_utc = endTime;
+          }
+        },
+        beforeUpdate: async (interview) => {
+          // Recalculer les heures UTC si scheduled_date ou duration change
+          if (interview.changed('scheduled_date') || interview.changed('duration_minutes')) {
+            if (interview.scheduled_date) {
+              interview.starts_at_utc = new Date(interview.scheduled_date);
+              const endTime = new Date(interview.scheduled_date);
+              endTime.setMinutes(endTime.getMinutes() + (interview.duration_minutes || 60));
+              interview.ends_at_utc = endTime;
+            }
+          }
+        }
       }
     }
   );

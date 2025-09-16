@@ -56,6 +56,17 @@ export class AuthInterceptor implements HttpInterceptor {
           if (error.status === 401) {
             console.error('User token expired or invalid, logging out...');
             this.authService.forceLogout();
+          } else if (error.status === 500) {
+            console.error('Server error detected, showing user-friendly message');
+            // Modifier l'erreur pour afficher un message utilisateur
+            const userFriendlyError = {
+              ...error,
+              error: {
+                ...error.error,
+                message: 'Erreur serveur interne, veuillez réessayer dans quelques instants'
+              }
+            };
+            return throwError(() => userFriendlyError);
           }
           return throwError(() => error);
         })
