@@ -25,7 +25,7 @@ export class AppComponent {
           '/login-selector', '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password',
           '/welcome', '/candidate/login', '/candidate/register', '/candidate/dashboard',
           '/candidate/job-offers', '/candidate/apply', '/candidate/applications', 
-          '/candidate/cvs', '/candidate/favorites'
+          '/candidate/cvs', '/candidate/favorites','/candidate/forgot-password'
         ]; 
         this.showSidebar = !authPages.some(page => event.urlAfterRedirects.startsWith(page));
       });

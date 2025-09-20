@@ -44,8 +44,8 @@ export const routes: Routes = [
   { path: 'edit-profile', component: EditProfileComponent, canActivate: [AuthGuard] },
   { path: 'job-descriptions', component: JobDescriptionsComponent, canActivate: [AuthGuard] },
   { path: 'matching', component: MatchingComponent, canActivate: [AuthGuard] },
-  { path: 'advanced-analytics', component: AdvancedAnalyticsComponent, canActivate: [AuthGuard], data: { roles: ['admin', 'hr'] } },
-  { path: 'skills-management', component: SkillsManagementComponent, canActivate: [AuthGuard], data: { roles: ['admin', 'hr'] } },
+  { path: 'advanced-analytics', component: AdvancedAnalyticsComponent, canActivate: [AuthGuard] },
+  { path: 'skills-management', component: SkillsManagementComponent, canActivate: [AuthGuard]},
   { path: 'organigramme', component: OrganigrammeComponent, canActivate: [AuthGuard] },
   { path: 'job-offer/create', component: JobOfferComponent, canActivate: [AuthGuard] },
   { path: 'job-offers', component: JobOfferComponent, canActivate: [AuthGuard] },
@@ -56,6 +56,11 @@ export const routes: Routes = [
   // Routes candidats
   { 
     path: 'candidate/login', 
+    loadComponent: () => import('./pages/candidate/login/candidate-login.component').then(m => m.CandidateLoginComponent),
+    canActivate: [CandidateGuestGuard] 
+  },
+   { 
+    path: 'candidate/forgot-password', 
     loadComponent: () => import('./pages/candidate/login/candidate-login.component').then(m => m.CandidateLoginComponent),
     canActivate: [CandidateGuestGuard] 
   },
@@ -104,8 +109,8 @@ export const routes: Routes = [
   { 
     path: 'recruiter/interviews', 
     loadComponent: () => import('./pages/recruiter/interviews/recruiter-interviews.component').then(m => m.RecruiterInterviewsComponent),
-    canActivate: [AuthGuard],
-    data: { roles: ['admin', 'hr'] }
+    canActivate: [AuthGuard]
+    
   },
   
   // Unauthorized page
