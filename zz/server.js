@@ -36,9 +36,11 @@ const candidateApplicationRoutes = require("./src/routes/candidateApplications")
 const candidateFavoritesRoutes = require("./src/routes/candidateFavorites");
 const publicJobOffersRoutes = require("./src/routes/publicJobOffers");
 const recruiterApplicationsRoutes = require("./src/routes/recruiterApplications");
+const recommendationRoutes = require('./src/routes/recommendations');
 
 // Routes entretiens
 const interviewRoutes = require("./src/routes/interviews");
+
 
 
 
@@ -53,7 +55,7 @@ app.use(cors({
   credentials: true
 }));
 app.get("/", (req, res) =>
-  res.json({ status: "Matchnhire backend node 22.11.0", version: "v1" })
+  res.json({ status: "Matchnhire backend node ", version: "v1" })
 );
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
@@ -80,6 +82,7 @@ app.use("/api/candidate/applications", candidateApplicationRoutes);
 app.use("/api/candidate/favorites", candidateFavoritesRoutes);
 app.use("/api/public/job-offers", publicJobOffersRoutes);
 app.use("/api/recruiter/applications", recruiterApplicationsRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 // Routes entretiens
 app.use("/api/interviews", authenticateToken, interviewRoutes);

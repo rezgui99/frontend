@@ -21,6 +21,7 @@ import { WelcomeComponent } from './pages/welcome/welcome.component';
 import { LoginSelectorComponent } from './components/login-selector/login-selector.component';
 import { CandidateAuthGuard } from './guards/candidate-auth.guard';
 import { CandidateGuestGuard } from './guards/candidate-guest.guard';
+import { RecommendationsComponent } from './pages/recommendations/recommendations.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login-selector', pathMatch: 'full' },
@@ -112,7 +113,11 @@ export const routes: Routes = [
     canActivate: [AuthGuard]
     
   },
-  
+    { 
+    path: 'recommendations', 
+    component: RecommendationsComponent, 
+    canActivate: [AuthGuard] 
+  },
   // Unauthorized page
   { path: 'unauthorized', loadComponent: () => import('./pages/unauthorized/unauthorized.component').then(m => m.UnauthorizedComponent) },
   

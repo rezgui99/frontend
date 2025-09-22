@@ -25,6 +25,8 @@ services:
       - ./fast_api:/app
     environment:
       - PYTHONUNBUFFERED=1
+      
+      
   db:
     image: postgres:15
     ports:

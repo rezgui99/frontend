@@ -1,0 +1,36 @@
+/* Styles spécifiques aux recommandations */
+.priority-badge {
+  @apply px-2 py-1 rounded text-xs font-medium;
+}
+
+.priority-critical {
+  @apply bg-red-100 text-red-800;
+}
+
+.priority-high {
+  @apply bg-orange-100 text-orange-800;
+}
+
+.priority-medium {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.priority-low {
+  @apply bg-green-100 text-green-800;
+}
+
+.compatibility-excellent {
+  @apply text-green-600 font-bold;
+}
+
+.compatibility-good {
+  @apply text-yellow-600 font-bold;
+}
+
+.compatibility-fair {
+  @apply text-orange-600 font-bold;
+}
+
+.compatibility-poor {
+  @apply text-red-600 font-bold;
+}
