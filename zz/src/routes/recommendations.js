@@ -1,144 +1,349 @@
 const express = require('express');
 const router = express.Router();
-
-// Middleware d'authentification (si nécessaire)
-// const { authenticateToken } = require('../middleware/auth');
-// const { requireAdminOrHR } = require('../middleware/roleAuth');
-
-/**
- * GET /api/recommendations/health
- * Endpoint de vérification de l'état de l'API de recommandation
- */
-router.get('/health', async (req, res) => {
-  try {
-    // Vérifier l'état de l'API de recommandation
-    const status = {
-      status: "Recommendation API running",
-      timestamp: new Date().toISOString(),
-      version: "1.0.0",
-      services: {
-        nodejs_backend: "healthy",
-        recommendation_ml_api: "checking..."
-      }
-    };
-
-    // Optionnel : Vérifier la connectivité avec l'API ML Python
-    try {
-      const axios = require('axios');
-      const mlApiResponse = await axios.get('http://localhost:8001/health', { timeout: 5000 });
-      status.services.recommendation_ml_api = "healthy";
-      status.ml_api_status = mlApiResponse.data;
-    } catch (mlError) {
-      console.warn('ML API not available:', mlError.message);
-      status.services.recommendation_ml_api = "unavailable";
-      status.ml_api_error = mlError.message;
-    }
-
-    res.status(200).json(status);
-  } catch (error) {
-    console.error('Error in recommendations health check:', error);
-    res.status(500).json({
-      status: "error",
-      message: "Erreur lors de la vérification de l'état",
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
+const { authenticateToken } = require('../middleware/auth');
+const { requireAdminOrHR } = require('../middleware/roleAuth');
+const {
+  checkRecommendationAPIHealth,
+  getTrainingRecommendations,
+  getEmployeeJobRecommendations,
+  validateRecommendationData,
+  getModelStatus,
+  retrainModels
+} = require('../controllers/recommendations');
 
 /**
- * GET /api/recommendations/employee/:employeeId/training/:targetJobId
- * Obtenir des recommandations de formation pour un employé
+ * @swagger
+ * /api/recommendations/health:
+ *   get:
+ *     summary: Vérifier la santé de l'API de recommandation
+ *     tags: [Recommendations]
+ *     responses:
+ *       200:
+ *         description: Statut de santé de l'API
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 ml_api:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     api_url:
+ *                       type: string
+ *                     models:
+ *                       type: object
+ *                 backend_status:
+ *                   type: string
+ *                 timestamp:
+ *                   type: string
  */
-router.get('/employee/:employeeId/training/:targetJobId', async (req, res) => {
-  try {
-    const { employeeId, targetJobId } = req.params;
-    
-    // TODO: Implémenter la logique de recommandation de formation
-    // Pour l'instant, retourner une réponse de placeholder
-    
-    res.status(200).json({
-      employee_id: parseInt(employeeId),
-      target_job_id: parseInt(targetJobId),
-      recommendations: [],
-      message: "Training recommendations endpoint - À implémenter",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error getting training recommendations:', error);
-    res.status(500).json({
-      error: "Erreur lors de la récupération des recommandations de formation",
-      message: error.message
-    });
-  }
-});
+router.get('/health', checkRecommendationAPIHealth);
 
 /**
- * GET /api/recommendations/employee/:employeeId/jobs
- * Obtenir des recommandations de poste pour un employé
+ * @swagger
+ * /api/recommendations/training/{employeeId}/{jobId}:
+ *   get:
+ *     summary: Obtenir des recommandations de formation pour un employé vers un poste spécifique
+ *     tags: [Recommendations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de l'employé
+ *         example: 53
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du poste cible
+ *         example: 73
+ *       - in: query
+ *         name: maxRecommendations
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *         description: Nombre maximum de recommandations
+ *       - in: query
+ *         name: priorityThreshold
+ *         schema:
+ *           type: number
+ *           default: 0.6
+ *         description: Seuil de priorité minimum
+ *     responses:
+ *       200:
+ *         description: Recommandations de formation générées
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 employeeId:
+ *                   type: integer
+ *                   example: 53
+ *                 jobId:
+ *                   type: integer
+ *                   example: 73
+ *                 employee:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     position:
+ *                       type: string
+ *                     department:
+ *                       type: string
+ *                 targetJob:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                     department:
+ *                       type: string
+ *                     family:
+ *                       type: string
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       skill:
+ *                         type: string
+ *                         example: "Java"
+ *                       skillType:
+ *                         type: string
+ *                         example: "Technique"
+ *                       currentLevel:
+ *                         type: string
+ *                         example: "Intermediate"
+ *                       requiredLevel:
+ *                         type: string
+ *                         example: "Advanced"
+ *                       gap:
+ *                         type: integer
+ *                         example: 1
+ *                       training:
+ *                         type: string
+ *                         example: "Formation Java Avancée"
+ *                       trainingType:
+ *                         type: string
+ *                         example: "Formation en ligne"
+ *                       estimatedDuration:
+ *                         type: string
+ *                         example: "40-60 heures"
+ *                       priority:
+ *                         type: string
+ *                         example: "Élevée"
+ *                       description:
+ *                         type: string
+ *                       estimatedCost:
+ *                         type: number
+ *                         example: 1200
+ *                 totalRecommendations:
+ *                   type: integer
+ *                 generatedAt:
+ *                   type: string
+ *                   format: date-time
+ *       404:
+ *         description: Employé ou poste non trouvé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 employeeId:
+ *                   type: integer
+ *                 jobId:
+ *                   type: integer
+ *       500:
+ *         description: Erreur serveur
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 details:
+ *                   type: string
+ *                 employeeId:
+ *                   type: integer
+ *                 jobId:
+ *                   type: integer
  */
-router.get('/employee/:employeeId/jobs', async (req, res) => {
-  try {
-    const { employeeId } = req.params;
-    const { department, limit = 10, minScore = 0.5 } = req.query;
-    
-    // TODO: Implémenter la logique de recommandation de poste
-    // Pour l'instant, retourner une réponse de placeholder
-    
-    res.status(200).json({
-      employee_id: parseInt(employeeId),
-      filters: { department, limit: parseInt(limit), minScore: parseFloat(minScore) },
-      recommendations: [],
-      message: "Job recommendations endpoint - À implémenter",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error getting job recommendations:', error);
-    res.status(500).json({
-      error: "Erreur lors de la récupération des recommandations de poste",
-      message: error.message
-    });
-  }
-});
+router.get('/training/:employeeId/:jobId', 
+  authenticateToken, 
+  requireAdminOrHR, 
+  getTrainingRecommendations
+);
 
 /**
- * GET /api/recommendations/status
- * Obtenir le statut général du système de recommandation
+ * @swagger
+ * /api/recommendations/employee/{employeeId}/jobs:
+ *   get:
+ *     summary: Obtenir des recommandations de poste pour un employé
+ *     tags: [Recommendations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de l'employé
+ *       - in: query
+ *         name: department
+ *         schema:
+ *           type: string
+ *         description: Filtrer par département
+ *       - in: query
+ *         name: maxRecommendations
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Nombre maximum de recommandations
+ *       - in: query
+ *         name: minCompatibilityScore
+ *         schema:
+ *           type: number
+ *           default: 0.5
+ *         description: Score de compatibilité minimum
+ *     responses:
+ *       200:
+ *         description: Recommandations de poste générées
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 employee:
+ *                   type: object
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 total:
+ *                   type: integer
+ *       404:
+ *         description: Employé non trouvé
+ *       500:
+ *         description: Erreur serveur
  */
-router.get('/status', async (req, res) => {
-  try {
-    const status = {
-      nodejs_api: {
-        status: "running",
-        uptime: process.uptime(),
-        memory_usage: process.memoryUsage(),
-        timestamp: new Date().toISOString()
-      },
-      ml_api: {
-        status: "checking...",
-        url: "http://localhost:8001"
-      }
-    };
+router.get('/employee/:employeeId/jobs', 
+  authenticateToken, 
+  requireAdminOrHR, 
+  getEmployeeJobRecommendations
+);
 
-    // Vérifier l'API ML
-    try {
-      const axios = require('axios');
-      const mlResponse = await axios.get('http://localhost:8001/health', { timeout: 3000 });
-      status.ml_api.status = "healthy";
-      status.ml_api.details = mlResponse.data;
-    } catch (error) {
-      status.ml_api.status = "unavailable";
-      status.ml_api.error = error.message;
-    }
+/**
+ * @swagger
+ * /api/recommendations/validate:
+ *   post:
+ *     summary: Valider les données avant envoi à l'API ML
+ *     tags: [Recommendations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               employee:
+ *                 type: object
+ *               target_job:
+ *                 type: object
+ *               available_jobs:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: Résultat de la validation
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 valid:
+ *                   type: boolean
+ *                 errors:
+ *                   type: array
+ *                 suggestions:
+ *                   type: array
+ */
+router.post('/validate', 
+  authenticateToken, 
+  requireAdminOrHR, 
+  validateRecommendationData
+);
 
-    res.status(200).json(status);
-  } catch (error) {
-    console.error('Error getting recommendation status:', error);
-    res.status(500).json({
-      error: "Erreur lors de la vérification du statut",
-      message: error.message
-    });
-  }
-});
+/**
+ * @swagger
+ * /api/recommendations/models/status:
+ *   get:
+ *     summary: Obtenir le statut des modèles ML
+ *     tags: [Recommendations]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statut des modèles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 models:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.get('/models/status', 
+  authenticateToken, 
+  requireAdminOrHR, 
+  getModelStatus
+);
+
+/**
+ * @swagger
+ * /api/recommendations/models/retrain:
+ *   post:
+ *     summary: Réentraîner les modèles ML
+ *     tags: [Recommendations]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Réentraînement terminé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 result:
+ *                   type: object
+ *                 timestamp:
+ *                   type: string
+ */
+router.post('/models/retrain', 
+  authenticateToken, 
+  requireAdminOrHR, 
+  retrainModels
+);
 
 module.exports = router;

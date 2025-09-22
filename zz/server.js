@@ -37,6 +37,8 @@ const candidateFavoritesRoutes = require("./src/routes/candidateFavorites");
 const publicJobOffersRoutes = require("./src/routes/publicJobOffers");
 const recruiterApplicationsRoutes = require("./src/routes/recruiterApplications");
 const recommendationRoutes = require('./src/routes/recommendations');
+const { globalHealthCheck } = require('./src/middleware/healthCheck');
+
 
 // Routes entretiens
 const interviewRoutes = require("./src/routes/interviews");
@@ -86,6 +88,13 @@ app.use('/api/recommendations', recommendationRoutes);
 
 // Routes entretiens
 app.use("/api/interviews", authenticateToken, interviewRoutes);
+
+// Global health check endpoint
+app.get('/health', globalHealthCheck);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
 
 // 404 - Route non trouvée
 app.use((req, res, next) => {

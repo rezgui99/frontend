@@ -43,7 +43,7 @@ const JobEmployeeSkillMatch = async (req, res) => {
       include: [
         {
           model: EmployeeSkill,
-          as: "EmployeeSkills", // <- alias corrigé
+          as: "EmployeeSkills", 
           include: [
             { model: Skill, as: "Skill", attributes: ["id", "name"] },
             { model: SkillLevel, as: "SkillLevel", attributes: ["id", "value"] },
