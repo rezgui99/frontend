@@ -124,27 +124,8 @@ async def get_training_recommendations(request: TrainingRecommendationRequest):
             priority_threshold=request.priority_threshold
         )
         
-        # Ajouter les métadonnées de calcul pour la cohérence
-        for rec in recommendations:
-            rec.calculation_method = "hybrid_ml_heuristic"
-            rec.formula_applied = {
-                "probability": f"ML_base({rec.ml_probability or 0.6:.2f}) + heuristic_adjustments({rec.heuristic_adjustments or 0:.2f})",
-                "roi": f"(salary_improvement * 2 - training_cost) / training_cost",
-                "duration": f"base_duration({rec.gap}) + complexity_factor + type_factor"
-            }
-        
         logger.info(f"✅ Generated {len(recommendations)} training recommendations")
-        
-        # Retourner avec métadonnées
-        return {
-            "employee": {"id": request.employee.id, "name": request.employee.name, "position": request.employee.position},
-            "target_job": {"id": request.target_job.id, "title": request.target_job.title, "department": request.target_job.department},
-            "recommendations": recommendations,
-            "total": len(recommendations),
-            "calculation_method": "hybrid_ml_heuristic",
-            "generated_at": datetime.now().isoformat(),
-            "api_status": "ml_available"
-        }
+        return recommendations
         
     except Exception as e:
         logger.error(f"❌ Error generating training recommendations: {e}")
@@ -173,25 +154,8 @@ async def get_job_recommendations(request: JobRecommendationRequest):
             min_compatibility_score=request.min_compatibility_score
         )
         
-        # Ajouter les métadonnées de calcul pour la cohérence
-        for rec in recommendations:
-            rec.calculation_method = "weighted_compatibility"
-            rec.formula_applied = {
-                "overall": "(skills * 0.7) + (experience * 0.2) + (certifications * 0.1)",
-                "breakdown": rec.calculation_breakdown if hasattr(rec, 'calculation_breakdown') else None
-            }
-        
         logger.info(f"✅ Generated {len(recommendations)} job recommendations")
-        
-        # Retourner avec métadonnées
-        return {
-            "employee": {"id": request.employee.id, "name": request.employee.name, "position": request.employee.position},
-            "recommendations": recommendations,
-            "total": len(recommendations),
-            "calculation_method": "weighted_compatibility", 
-            "generated_at": datetime.now().isoformat(),
-            "api_status": "ml_available"
-        }
+        return recommendations
         
     except Exception as e:
         logger.error(f"❌ Error generating job recommendations: {e}")

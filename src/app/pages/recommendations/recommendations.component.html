@@ -36,7 +36,6 @@
           <strong>🧮 Calculs alignés sur la documentation</strong> - 
           {{ apiHealthy ? 'API ML active: probabilité hybride (ML + heuristique)' : 'Fallback heuristique actif' }}.
           Pondération poste: 70% compétences + 20% expérience + 10% certifications.
-          ROI dynamique: (amélioration_salariale × 2 - coût_formation) / coût_formation.
         </p>
       </div>
     </div>
@@ -337,10 +336,7 @@
                 {{ ((rec.certification_match_score || 0.5) * 100) | number:'1.0-0' }}%
               </span>
             </div>
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Confiance:</span>
-              <span>{{ (rec.confidence_level * 100) | number:'1.0-0' }}%</span>
-            </div>
+        
             
             <!-- Pondération documentée -->
             <div class="mt-2 p-2 bg-gray-100 rounded text-xs">

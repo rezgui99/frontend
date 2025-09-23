@@ -282,13 +282,16 @@ export class RecommendationService {
     let baseProbability = 0.6;
     
     // Facteur niveau actuel (plus c'est bas, plus c'est facile d'améliorer)
-    const levelFactor = Math.max(0, (5 - rec.current_level) * 0.05);
+    const level = rec.current_level ?? rec.currentLevel ?? 0;
+    const levelFactor = Math.max(0, (5 - level) * 0.05);
     
     // Facteur écart (plus l'écart est grand, plus c'est difficile)
-    const gapFactor = Math.max(0, rec.gap * 0.1);
+    const gap = rec.gap ?? 0;
+    const gapFactor = Math.max(0, gap * 0.1);
     
     // Facteur type de compétence
-    const typeFactor = this.getSkillTypeSuccessFactor(rec.skill_type);
+    const type = rec.skill_type ?? rec.skillType ?? '';
+    const typeFactor = this.getSkillTypeSuccessFactor(type);
     
     return Math.max(0.2, Math.min(0.9, baseProbability + levelFactor - gapFactor + typeFactor));
   }
@@ -298,20 +301,20 @@ export class RecommendationService {
    */
   private calculateTrainingDuration(gap: number, skillType: string): number {
     // Durée de base selon l'écart
-    const baseDuration = gap * 20; // 20h par niveau d'écart
+    const baseDuration = (gap ?? 0) * 20; // 20h par niveau d'écart
     
     // Facteur selon le type de compétence
-    const typeFactors = {
+    const typeFactors: Record<string, number> = {
       'Technique': 1.2,
       'Managériale': 1.0,
       'Communication': 0.8,
       'Analytique': 1.1
     };
     
-    const typeFactor = typeFactors[skillType as keyof typeof typeFactors] || 1.0;
+    const typeFactor = typeFactors[skillType as keyof typeof typeFactors] ?? 1.0;
     
     // Facteur de complexité (plus l'écart est grand, plus c'est complexe)
-    const complexityFactor = 1 + (gap - 1) * 0.1;
+    const complexityFactor = 1 + (Math.max(1, gap ?? 0) - 1) * 0.1;
     
     const totalDuration = Math.round(baseDuration * typeFactor * complexityFactor);
     
@@ -355,50 +358,83 @@ export class RecommendationService {
 
   /**
    * Calculer le score de correspondance des compétences avec validation robuste
+   * - Gère alias de clés (snake/camel)
+   * - Fallback par "counts" si pas de détails
+   * - Fallback final sur rec.skill_score si fourni par l'API
    */
   private calculateSkillMatchScore(rec: any): number {
-    // Validation robuste - accepter tableau, objet, null
-    const matchingSkills = this.ensureArray(rec.matching_skills);
-    const missingSkills = this.ensureArray(rec.missing_skills);
-    const exceedingSkills = this.ensureArray(rec.exceeding_skills);
-    
-    const totalSkills = matchingSkills.length + missingSkills.length + exceedingSkills.length;
-    
+    // 1) Récupérer différentes variantes de clés
+    const matchingSkills = this.toArray(
+      this.pickFirst(rec, ['matching_skills', 'matchingSkills', 'matched_skills', 'skills_matched'])
+    );
+    const missingSkills = this.toArray(
+      this.pickFirst(rec, ['missing_skills', 'missingSkills', 'skills_missing'])
+    );
+    const exceedingSkills = this.toArray(
+      this.pickFirst(rec, ['exceeding_skills', 'exceedingSkills', 'overqualified_skills', 'skills_exceeding'])
+    );
+
+    let totalSkills = matchingSkills.length + missingSkills.length + exceedingSkills.length;
+
+    // 2) Si aucun détail, tenter un fallback par "counts"
     if (totalSkills === 0) {
-      console.warn('⚠️ No skills data available for compatibility calculation');
-      return 0.5; // Score par défaut si pas de données
+      const matchingCount = this.safeGetNumber(
+        this.pickFirst(rec, ['matching_skills_count', 'matchingCount', 'skills_matched_count']), 0
+      );
+      const missingCount = this.safeGetNumber(
+        this.pickFirst(rec, ['missing_skills_count', 'missingCount', 'skills_missing_count']), 0
+      );
+      const exceedingCount = this.safeGetNumber(
+        this.pickFirst(rec, ['exceeding_skills_count', 'exceedingCount', 'skills_exceeding_count']), 0
+      );
+
+      const totalCount = matchingCount + missingCount + exceedingCount;
+      if (totalCount > 0) {
+        const score = matchingCount / totalCount; // ratio simple
+        console.log(`ℹ️ Skill score via counts: ${matchingCount}/${totalCount} = ${score}`);
+        return Math.max(0, Math.min(1, score));
+      }
+
+      // 3) Fallback final: score déjà fourni par l'API
+      const apiSkillScore = this.safeGetNumber(this.pickFirst(rec, ['skill_score', 'skillsScore']), NaN);
+      if (!isNaN(apiSkillScore)) {
+        console.log(`ℹ️ Skill score via API field: ${apiSkillScore}`);
+        return Math.max(0, Math.min(1, apiSkillScore));
+      }
+
+      // 4) Rien du tout: score neutre, pas de warn bruyant
+      return 0.5;
     }
-    
-    // Score pondéré selon les niveaux
+
+    // 5) Calcul pondéré quand on a du détail
     let weightedScore = 0;
     let totalWeight = 0;
-    
-    // Traiter les compétences correspondantes
+
+    // matching
     matchingSkills.forEach((skill: any) => {
-      const weight = this.safeGetNumber(skill.weight, 1.0);
-      const currentLevel = this.safeGetNumber(skill.current_level, 0);
-      const requiredLevel = this.safeGetNumber(skill.required_level, 1);
-      
+      const weight = this.safeGetNumber(skill?.weight, 1.0);
+      const currentLevel = this.safeGetNumber(skill?.current_level ?? skill?.currentLevel, 0);
+      const requiredLevel = this.safeGetNumber(skill?.required_level ?? skill?.requiredLevel, 1);
       const levelRatio = requiredLevel > 0 ? Math.min(1, currentLevel / requiredLevel) : 0;
       weightedScore += levelRatio * weight;
       totalWeight += weight;
     });
-    
-    // Traiter les compétences dépassées (bonus)
+
+    // exceeding = bonus plein
     exceedingSkills.forEach((skill: any) => {
-      const weight = this.safeGetNumber(skill.weight, 1.0);
-      weightedScore += 1.0 * weight; // Score complet pour les compétences dépassées
+      const weight = this.safeGetNumber(skill?.weight, 1.0);
+      weightedScore += 1.0 * weight;
       totalWeight += weight;
     });
-    
-    // Les compétences manquantes contribuent au poids total mais pas au score
+
+    // missing = ne contribue qu'au poids
     missingSkills.forEach((skill: any) => {
-      const weight = this.safeGetNumber(skill.weight, 1.0);
+      const weight = this.safeGetNumber(skill?.weight, 1.0);
       totalWeight += weight;
     });
-    
-    const finalScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
-    
+
+    const finalScore = totalWeight > 0 ? weightedScore / totalWeight : 0.5;
+
     console.log(`🎯 Skill match calculation: weighted_score(${weightedScore}) / total_weight(${totalWeight}) = ${finalScore}`);
     return Math.max(0, Math.min(1, finalScore));
   }
@@ -407,8 +443,11 @@ export class RecommendationService {
    * Calculer le score de correspondance d'expérience
    */
   private calculateExperienceMatchScore(rec: any): number {
-    const employeeYears = this.safeGetNumber(rec.employee_experience_years, 2);
-    const requiredYears = this.getRequiredExperienceYears(rec.experience_level);
+    const employeeYears = this.safeGetNumber(
+      rec.employee_experience_years ?? rec.employeeExperienceYears, 2
+    );
+    const level = rec.experience_level ?? rec.experienceLevel ?? 'Confirmé';
+    const requiredYears = this.getRequiredExperienceYears(level);
     
     if (employeeYears >= requiredYears) {
       return 1.0;
@@ -421,8 +460,12 @@ export class RecommendationService {
    * Calculer le score de correspondance des certifications
    */
   private calculateCertificationMatchScore(rec: any): number {
-    const employeeCertifications = this.safeGetNumber(rec.employee_certifications, 0);
-    const requiredCertifications = this.safeGetNumber(rec.required_certifications, 0);
+    const employeeCertifications = this.safeGetNumber(
+      rec.employee_certifications ?? rec.employeeCertifications, 0
+    );
+    const requiredCertifications = this.safeGetNumber(
+      rec.required_certifications ?? rec.requiredCertifications, 0
+    );
     
     if (requiredCertifications === 0) return 1.0;
     
@@ -433,17 +476,17 @@ export class RecommendationService {
    * Générer une justification détaillée pour une recommandation de formation
    */
   private generateDetailedTrainingJustification(rec: any): string {
-    const currentLevel = rec.current_level || 0;
-    const targetLevel = rec.target_level;
-    const gap = rec.gap;
-    const skillName = rec.skill_name;
-    const duration = rec.estimated_duration_hours;
+    const currentLevel = rec.current_level ?? rec.currentLevel ?? 0;
+    const targetLevel = rec.target_level ?? rec.targetLevel ?? '';
+    const gap = rec.gap ?? 0;
+    const skillName = rec.skill_name ?? rec.skillName ?? 'Compétence';
+    const duration = rec.estimated_duration_hours ?? rec.estimatedDurationHours ?? 0;
     const probability = Math.round((rec.success_probability || 0.6) * 100);
     
     return `Compétence ${skillName}: Niveau actuel ${currentLevel} → Niveau cible ${targetLevel} → Écart de ${gap} niveau(x). ` +
            `Formation ${rec.training_type || 'mixte'} recommandée: ${duration}h, ` +
            `probabilité de succès ${probability}%. ` +
-           `Priorité ${rec.priority} basée sur l'importance métier et l'impact carrière.`;
+           `Priorité ${rec.priority ?? 'Moyenne'} basée sur l'importance métier et l'impact carrière.`;
   }
 
   /**
@@ -455,13 +498,17 @@ export class RecommendationService {
     const expScore = Math.round(compatibility.experience_score * 100);
     const certScore = Math.round(compatibility.certification_score * 100);
     
-    const matchingCount = this.ensureArray(rec.matching_skills).length;
-    const missingCount = this.ensureArray(rec.missing_skills).length;
+    const matchingCount = this.ensureArray(
+      this.pickFirst(rec, ['matching_skills','matchingSkills'])
+    ).length;
+    const missingCount = this.ensureArray(
+      this.pickFirst(rec, ['missing_skills','missingSkills'])
+    ).length;
     
     return `Score de compatibilité ${overallScore}% calculé selon la pondération documentée: ` +
            `Compétences ${skillScore}% (poids 70%) + Expérience ${expScore}% (poids 20%) + Certifications ${certScore}% (poids 10%). ` +
            `${matchingCount} compétence(s) correspondante(s), ${missingCount} compétence(s) à développer. ` +
-           `Niveau de préparation: ${rec.readiness_level}. Potentiel de croissance: ${Math.round((rec.growth_potential || 0.7) * 100)}%.`;
+           `Niveau de préparation: ${rec.readiness_level ?? 'À préciser'}. Potentiel de croissance: ${Math.round((rec.growth_potential || 0.7) * 100)}%.`;
   }
 
   /**
@@ -591,17 +638,33 @@ export class RecommendationService {
   /**
    * Utilitaires pour la validation robuste des données
    */
-  private ensureArray(value: any): any[] {
-    if (Array.isArray(value)) {
-      return value;
+  private toArray(value: any): any[] {
+    if (Array.isArray(value)) return value;
+    if (value === null || value === undefined) return [];
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed && typeof parsed === 'object') return [parsed];
+        return [];
+      } catch {
+        return [];
+      }
     }
-    if (value && typeof value === 'object') {
-      return [value];
-    }
-    if (value === null || value === undefined) {
-      return [];
-    }
+    if (typeof value === 'object') return [value];
     return [];
+  }
+
+  private pickFirst<T = any>(obj: any, keys: string[]): T | undefined {
+    if (!obj) return undefined as any;
+    for (const k of keys) {
+      if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+    }
+    return undefined as any;
+  }
+
+  private ensureArray(value: any): any[] {
+    return this.toArray(value);
   }
 
   private safeGetNumber(value: any, defaultValue: number): number {
@@ -651,13 +714,13 @@ export class RecommendationService {
    * Utilitaires pour les calculs
    */
   private getSkillTypeSuccessFactor(skillType: string): number {
-    const factors = {
+    const factors: Record<string, number> = {
       'Technique': 0.05,
       'Managériale': -0.05,
       'Communication': 0.1,
       'Analytique': 0.0
     };
-    return factors[skillType as keyof typeof factors] || 0;
+    return factors[skillType as keyof typeof factors] ?? 0;
   }
 
   private selectTrainingType(gap: number, skillType: string): string {
@@ -674,7 +737,7 @@ export class RecommendationService {
   }
 
   private getTrainingBenefits(skillType: string): string[] {
-    const benefits = {
+    const benefits: Record<string, string[]> = {
       'Technique': ['Amélioration de la productivité technique', 'Accès à de nouveaux projets', 'Évolution salariale'],
       'Managériale': ['Leadership renforcé', 'Gestion d\'équipe efficace', 'Opportunités de promotion'],
       'Communication': ['Relations interpersonnelles améliorées', 'Efficacité en réunion', 'Influence accrue'],
@@ -684,7 +747,7 @@ export class RecommendationService {
   }
 
   private getRequiredExperienceYears(level: string): number {
-    const requirements = {
+    const requirements: Record<string, number> = {
       'Junior': 1,
       'Confirmé': 3,
       'Senior': 5,
@@ -704,7 +767,7 @@ export class RecommendationService {
   }
 
   private calculateSalaryPotential(department: string): any {
-    const ranges = {
+    const ranges: Record<string, {min:number,max:number}> = {
       'Développement': { min: 35000, max: 80000 },
       'Marketing': { min: 30000, max: 70000 },
       'RH': { min: 28000, max: 65000 },

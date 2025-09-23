@@ -342,7 +342,7 @@ Obtient des recommandations de formation pour combler les écarts de compétence
       }
     ],
     "success_probability": 0.78,
-    "roi_estimate": 2.4
+   
   }
 ]
 ```
@@ -900,22 +900,6 @@ services:
           memory: 1G
 ```
 
-### 3. Monitoring avec Prometheus (optionnel)
-
-```python
-from prometheus_client import Counter, Histogram, generate_latest
-
-REQUEST_COUNT = Counter('api_requests_total', 'Total API requests')
-REQUEST_LATENCY = Histogram('api_request_duration_seconds', 'API request latency')
-
-@app.middleware("http")
-async def add_prometheus_metrics(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    REQUEST_COUNT.inc()
-    REQUEST_LATENCY.observe(time.time() - start_time)
-    return response
-```
 
 ## 📈 Performance et Optimisation
 
