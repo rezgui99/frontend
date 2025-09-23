@@ -60,7 +60,7 @@
             [(ngModel)]="selectedEmployeeId" 
             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
             <option [ngValue]="null">-- Sélectionner un employé --</option>
-            <option *ngFor="let emp of employees" [ngValue]="emp.id">
+            <option *ngFor="let emp of employees || []" [ngValue]="emp.id">
               {{ emp.name }} - {{ emp.position }}
             </option>
           </select>
@@ -73,7 +73,7 @@
             [(ngModel)]="selectedTargetJobId" 
             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
             <option [ngValue]="null">-- Sélectionner un poste cible --</option>
-            <option *ngFor="let job of jobDescriptions" [ngValue]="job.id">
+            <option *ngFor="let job of jobDescriptions || []" [ngValue]="job.id">
               {{ job.emploi }} ({{ job.filiere_activite }})
             </option>
           </select>
@@ -116,18 +116,18 @@
     </div>
 
     <!-- Résultats de formation -->
-    <div *ngIf="trainingRecommendations.length > 0" class="space-y-4">
+    <div *ngIf="trainingRecommendations && trainingRecommendations.length > 0" class="space-y-4">
       <h3 class="text-xl font-semibold">📊 Recommandations de formation</h3>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div *ngFor="let rec of trainingRecommendations" class="card border-l-4" 
+        <div *ngFor="let rec of trainingRecommendations || []" class="card border-l-4" 
              [ngClass]="rec.priority === 'Critique' ? 'border-red-500' : rec.priority === 'Élevée' ? 'border-orange-500' : rec.priority === 'Moyenne' ? 'border-yellow-500' : 'border-green-500'">
           
           <!-- En-tête de la carte -->
           <div class="flex justify-between items-start mb-3">
             <div>
               <h4 class="font-semibold text-lg">{{ rec.skill_name }}</h4>
-              <span class="text-sm text-gray-600">{{ rec.skill_type }}</span>
+              <span class="text-sm text-gray-600">{{ rec.skill_type || 'Type non défini' }}</span>
             </div>
             <span class="px-2 py-1 rounded text-xs font-medium" [ngClass]="getPriorityColor(rec.priority)">
               {{ rec.priority }}
@@ -167,11 +167,11 @@
                 {{ (rec.success_probability * 100) | number:'1.0-0' }}%
               </span>
             </div>
-            <div *ngIf="rec.estimated_cost" class="flex justify-between">
+            <div *ngIf="rec.estimated_cost != null" class="flex justify-between">
               <span class="text-gray-600">Coût estimé:</span>
               <span class="font-medium">{{ rec.estimated_cost | currency:'EUR' }}</span>
             </div>
-            <div *ngIf="rec.roi_estimate" class="flex justify-between">
+            <div *ngIf="rec.roi_estimate != null" class="flex justify-between">
               <span class="text-gray-600">ROI estimé:</span>
               <span class="font-medium text-green-600">{{ rec.roi_estimate | number:'1.1-1' }}x</span>
             </div>
@@ -183,10 +183,10 @@
           </div>
 
           <!-- Bénéfices attendus -->
-          <div *ngIf="rec.expected_benefits.length > 0" class="mt-3">
+          <div *ngIf="rec.expected_benefits && rec.expected_benefits.length > 0" class="mt-3">
             <p class="text-sm font-medium mb-1">Bénéfices attendus:</p>
             <ul class="text-sm text-gray-600 list-disc list-inside">
-              <li *ngFor="let benefit of rec.expected_benefits">{{ benefit }}</li>
+              <li *ngFor="let benefit of rec.expected_benefits || []">{{ benefit }}</li>
             </ul>
           </div>
         </div>
@@ -207,7 +207,7 @@
             [(ngModel)]="selectedEmployeeId" 
             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
             <option [ngValue]="null">-- Sélectionner un employé --</option>
-            <option *ngFor="let emp of employees" [ngValue]="emp.id">
+            <option *ngFor="let emp of employees || []" [ngValue]="emp.id">
               {{ emp.name }} - {{ emp.position }}
             </option>
           </select>
@@ -220,7 +220,7 @@
             [(ngModel)]="selectedDepartment" 
             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
             <option value="">-- Tous les départements --</option>
-            <option *ngFor="let dept of departments" [value]="dept">{{ dept }}</option>
+            <option *ngFor="let dept of departments || []" [value]="dept">{{ dept }}</option>
           </select>
         </div>
 
@@ -261,11 +261,11 @@
     </div>
 
     <!-- Résultats de postes -->
-    <div *ngIf="jobRecommendations.length > 0" class="space-y-4">
+    <div *ngIf="jobRecommendations && jobRecommendations.length > 0" class="space-y-4">
       <h3 class="text-xl font-semibold">🎯 Postes recommandés</h3>
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div *ngFor="let rec of jobRecommendations" class="card hover:shadow-lg transition-shadow">
+        <div *ngFor="let rec of jobRecommendations || []" class="card hover:shadow-lg transition-shadow">
           
           <!-- En-tête -->
           <div class="flex justify-between items-start mb-3">
@@ -308,7 +308,7 @@
                [ngClass]="rec.readiness_level === 'Prêt' ? 'text-green-800' : rec.readiness_level === 'Formation courte nécessaire' ? 'text-yellow-800' : 'text-orange-800'">
               {{ rec.readiness_level }}
             </p>
-            <p class="text-xs mt-1" 
+            <p *ngIf="rec.estimated_transition_time" class="text-xs mt-1" 
                [ngClass]="rec.readiness_level === 'Prêt' ? 'text-green-600' : rec.readiness_level === 'Formation courte nécessaire' ? 'text-yellow-600' : 'text-orange-600'">
               Transition: {{ rec.estimated_transition_time }}
             </p>
@@ -316,14 +316,14 @@
 
           <!-- Analyse des compétences -->
           <div class="space-y-2 mb-3">
-            <div *ngIf="rec.matching_skills.length > 0">
-              <p class="text-xs font-medium text-green-700">✅ Compétences correspondantes: {{ rec.matching_skills.length }}</p>
+            <div *ngIf="rec.matching_skills && rec.matching_skills.length > 0">
+              <p class="text-xs font-medium text-green-700">✅ Compétences correspondantes: {{ rec.matching_skills?.length || 0 }}</p>
             </div>
-            <div *ngIf="rec.missing_skills.length > 0">
-              <p class="text-xs font-medium text-red-700">❌ Compétences manquantes: {{ rec.missing_skills.length }}</p>
+            <div *ngIf="rec.missing_skills && rec.missing_skills.length > 0">
+              <p class="text-xs font-medium text-red-700">❌ Compétences manquantes: {{ rec.missing_skills?.length || 0 }}</p>
             </div>
-            <div *ngIf="rec.exceeding_skills.length > 0">
-              <p class="text-xs font-medium text-blue-700">⭐ Compétences supérieures: {{ rec.exceeding_skills.length }}</p>
+            <div *ngIf="rec.exceeding_skills && rec.exceeding_skills.length > 0">
+              <p class="text-xs font-medium text-blue-700">⭐ Compétences supérieures: {{ rec.exceeding_skills?.length || 0 }}</p>
             </div>
           </div>
 
@@ -335,7 +335,7 @@
             </div>
             <div *ngIf="rec.salary_potential" class="text-xs text-right">
               <span class="text-gray-600">Salaire:</span>
-              <span class="ml-1 font-medium">{{ rec.salary_potential.median | currency:'EUR':false:'1.0-0' }}</span>
+              <span class="ml-1 font-medium">{{ rec.salary_potential?.median | currency:'EUR':false:'1.0-0' }}</span>
             </div>
           </div>
 
@@ -345,10 +345,10 @@
           </div>
 
           <!-- Actions recommandées -->
-          <div *ngIf="rec.recommended_actions.length > 0" class="mt-3">
+          <div *ngIf="rec.recommended_actions && rec.recommended_actions.length > 0" class="mt-3">
             <p class="text-xs font-medium text-gray-700 mb-1">Actions recommandées:</p>
             <ul class="text-xs text-gray-600 space-y-1">
-              <li *ngFor="let action of rec.recommended_actions" class="flex items-start">
+              <li *ngFor="let action of rec.recommended_actions || []" class="flex items-start">
                 <span class="mr-1">→</span>
                 <span>{{ action }}</span>
               </li>

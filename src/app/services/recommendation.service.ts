@@ -35,12 +35,18 @@ export class RecommendationService {
       .set('maxRecommendations', maxRecommendations.toString())
       .set('priorityThreshold', priorityThreshold.toString());
 
-    return this.http.get<TrainingRecommendationResponse>(
-      `${this.apiUrl}/training/${employeeId}/${targetJobId}`,
-      { params }
-    ).pipe(
+    const url = `${this.apiUrl}/training/${employeeId}/${targetJobId}`;
+    console.log('🎓 Calling training recommendations API:', url, 'with params:', params.toString());
+
+    return this.http.get<TrainingRecommendationResponse>(url, { params }).pipe(
+      map(response => {
+        console.log('✅ Training recommendations response:', response);
+        return response;
+      }),
       catchError(error => {
-        console.error('Error getting training recommendations:', error);
+        console.error('❌ Error getting training recommendations:', error);
+        console.error('Request URL:', url);
+        console.error('Request params:', params.toString());
         throw error;
       })
     );
@@ -52,23 +58,30 @@ export class RecommendationService {
   getJobRecommendations(
     employeeId: number,
     department?: string,
-    limit: number = 10,
-    minScore: number = 0.5
+    maxRecommendations: number = 10,
+    minCompatibilityScore: number = 0.5
   ): Observable<JobRecommendationResponse> {
     let params = new HttpParams()
-      .set('limit', limit.toString())
-      .set('minScore', minScore.toString());
+      .set('maxRecommendations', maxRecommendations.toString())
+      .set('minCompatibilityScore', minCompatibilityScore.toString());
     
     if (department) {
       params = params.set('department', department);
     }
 
-    return this.http.get<JobRecommendationResponse>(
-      `${this.apiUrl}/jobs/${employeeId}`,
-      { params }
-    ).pipe(
+    // CORRECTION: Utiliser la bonne route backend
+    const url = `${this.apiUrl}/employee/${employeeId}/jobs`;
+    console.log('💼 Calling job recommendations API:', url, 'with params:', params.toString());
+
+    return this.http.get<JobRecommendationResponse>(url, { params }).pipe(
+      map(response => {
+        console.log('✅ Job recommendations response:', response);
+        return response;
+      }),
       catchError(error => {
-        console.error('Error getting job recommendations:', error);
+        console.error('❌ Error getting job recommendations:', error);
+        console.error('Request URL:', url);
+        console.error('Request params:', params.toString());
         throw error;
       })
     );
@@ -78,11 +91,53 @@ export class RecommendationService {
    * Vérifier le statut de l'API de recommandation
    */
   checkAPIHealth(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/health`).pipe(
-      map(response => ({ status: 'healthy', ...response })),
+    const url = `${this.apiUrl}/health`;
+    console.log('🏥 Checking API health:', url);
+    
+    return this.http.get(url).pipe(
+      map(response => {
+        console.log('✅ API Health response:', response);
+        return { status: 'healthy', ...response };
+      }),
       catchError(error => {
-        console.error('Recommendation API is not available:', error);
+        console.error('❌ Recommendation API is not available:', error);
         return of({ status: 'unhealthy', error: error.message });
+      })
+    );
+  }
+
+  /**
+   * Valider les données de recommandation
+   */
+  validateRecommendationData(data: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/validate`, data).pipe(
+      catchError(error => {
+        console.error('Error validating recommendation data:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Obtenir le statut des modèles ML
+   */
+  getModelStatus(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/models/status`).pipe(
+      catchError(error => {
+        console.error('Error getting model status:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Réentraîner les modèles ML
+   */
+  retrainModels(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/models/retrain`, {}).pipe(
+      catchError(error => {
+        console.error('Error retraining models:', error);
+        throw error;
       })
     );
   }

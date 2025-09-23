@@ -86,12 +86,13 @@ export class RecommendationsComponent implements OnInit {
     this.loadingEmployees = true;
     this.employeeService.getEmployees().subscribe({
       next: (employees) => {
-        this.employees = employees;
+        this.employees = employees || [];
         this.loadingEmployees = false;
       },
       error: (error) => {
         console.error('Error loading employees:', error);
         this.errorMessage = 'Erreur lors du chargement des employés.';
+        this.employees = [];
         this.loadingEmployees = false;
       }
     });
@@ -101,84 +102,132 @@ export class RecommendationsComponent implements OnInit {
     this.loadingJobs = true;
     this.jobDescriptionService.getJobDescriptions().subscribe({
       next: (jobs) => {
-        this.jobDescriptions = jobs;
+        this.jobDescriptions = jobs || [];
         // Extraire les départements uniques
-        this.departments = [...new Set(jobs.map(j => j.filiere_activite).filter(d => d))];
+        this.departments = [...new Set((jobs || []).map(j => j.filiere_activite).filter(d => d))];
         this.loadingJobs = false;
       },
       error: (error) => {
         console.error('Error loading jobs:', error);
         this.errorMessage = 'Erreur lors du chargement des postes.';
+        this.jobDescriptions = [];
+        this.departments = [];
         this.loadingJobs = false;
       }
     });
   }
 
-  getTrainingRecommendations(): void {
-    if (!this.selectedEmployeeId || !this.selectedTargetJobId) {
-      this.errorMessage = 'Veuillez sélectionner un employé et un poste cible.';
-      return;
-    }
+// Méthodes corrigées pour recommendations.component.ts
 
-    this.loadingTraining = true;
-    this.errorMessage = null;
-    this.trainingRecommendations = [];
-
-    this.recommendationService.getTrainingRecommendations(
-      this.selectedEmployeeId,
-      this.selectedTargetJobId,
-      this.maxTrainingRecommendations,
-      this.priorityThreshold
-    ).subscribe({
-      next: (response) => {
-        this.trainingRecommendations = response.recommendations;
-        this.successMessage = `${response.total} recommandation(s) de formation trouvée(s).`;
-        this.loadingTraining = false;
-      },
-      error: (error) => {
-        console.error('Error getting training recommendations:', error);
-        this.errorMessage = error.error?.error || 'Erreur lors de la récupération des recommandations de formation.';
-        this.loadingTraining = false;
-      }
-    });
+getTrainingRecommendations(): void {
+  if (!this.selectedEmployeeId || !this.selectedTargetJobId) {
+    this.errorMessage = 'Veuillez sélectionner un employé et un poste cible.';
+    return;
   }
 
-  getJobRecommendations(): void {
-    if (!this.selectedEmployeeId) {
-      this.errorMessage = 'Veuillez sélectionner un employé.';
-      return;
+  this.loadingTraining = true;
+  this.errorMessage = null;
+  this.successMessage = null;
+  this.trainingRecommendations = [];
+
+  console.log('🎓 Getting training recommendations for:', {
+    employeeId: this.selectedEmployeeId,
+    targetJobId: this.selectedTargetJobId,
+    maxRecommendations: this.maxTrainingRecommendations,
+    priorityThreshold: this.priorityThreshold
+  });
+
+  this.recommendationService.getTrainingRecommendations(
+    this.selectedEmployeeId,
+    this.selectedTargetJobId,
+    this.maxTrainingRecommendations,
+    this.priorityThreshold
+  ).subscribe({
+    next: (response) => {
+      console.log('✅ Training recommendations response:', response);
+
+      // 1) Toujours prendre un tableau
+      const recs = Array.isArray(response?.recommendations) ? response.recommendations : [];
+
+      // 2) Assigner au state
+      this.trainingRecommendations = recs;
+
+      // 3) Construire un message *texte* propre (jamais un objet/array)
+      const total =
+        (typeof (response as any)?.totalRecommendations === 'number' && (response as any).totalRecommendations) ||
+        (typeof (response as any)?.total === 'number' && (response as any).total) ||
+        recs.length;
+
+      this.successMessage = `${total} recommandation(s) de formation trouvée(s).`;
+      this.loadingTraining = false;
+    },
+    error: (error) => {
+      console.error('❌ Error getting training recommendations:', error);
+      this.errorMessage = error?.error?.error || error?.message || 'Erreur lors de la récupération des recommandations de formation.';
+      this.trainingRecommendations = [];
+      this.loadingTraining = false;
     }
+  });
+}
 
-    this.loadingJobRecs = true;
-    this.errorMessage = null;
-    this.jobRecommendations = [];
-
-    this.recommendationService.getJobRecommendations(
-      this.selectedEmployeeId,
-      this.selectedDepartment || undefined,
-      this.maxJobRecommendations,
-      this.minCompatibilityScore
-    ).subscribe({
-      next: (response) => {
-        this.jobRecommendations = response.recommendations;
-        this.successMessage = `${response.total} poste(s) recommandé(s) trouvé(s).`;
-        this.loadingJobRecs = false;
-      },
-      error: (error) => {
-        console.error('Error getting job recommendations:', error);
-        this.errorMessage = error.error?.error || 'Erreur lors de la récupération des recommandations de poste.';
-        this.loadingJobRecs = false;
-      }
-    });
+getJobRecommendations(): void {
+  if (!this.selectedEmployeeId) {
+    this.errorMessage = 'Veuillez sélectionner un employé.';
+    return;
   }
+
+  this.loadingJobRecs = true;
+  this.errorMessage = null;
+  this.successMessage = null;
+  this.jobRecommendations = [];
+
+  console.log('💼 Getting job recommendations for:', {
+    employeeId: this.selectedEmployeeId,
+    department: this.selectedDepartment,
+    maxRecommendations: this.maxJobRecommendations,
+    minCompatibilityScore: this.minCompatibilityScore
+  });
+
+  this.recommendationService.getJobRecommendations(
+    this.selectedEmployeeId,
+    this.selectedDepartment || undefined,
+    this.maxJobRecommendations,
+    this.minCompatibilityScore
+  ).subscribe({
+    next: (response) => {
+      console.log('✅ Job recommendations response:', response);
+
+      // 1) Toujours prendre un tableau
+      const recs = Array.isArray(response?.recommendations) ? response.recommendations : [];
+
+      // 2) Assigner au state
+      this.jobRecommendations = recs;
+
+      // 3) Message texte robuste
+      const total =
+        (typeof (response as any)?.totalRecommendations === 'number' && (response as any).totalRecommendations) ||
+        (typeof (response as any)?.total === 'number' && (response as any).total) ||
+        recs.length;
+
+      this.successMessage = `${total} poste(s) recommandé(s) trouvé(s).`;
+      this.loadingJobRecs = false;
+    },
+    error: (error) => {
+      console.error('❌ Error getting job recommendations:', error);
+      this.errorMessage = error?.error?.error || error?.message || 'Erreur lors de la récupération des recommandations de poste.';
+      this.jobRecommendations = [];
+      this.loadingJobRecs = false;
+    }
+  });
+}
 
   // Méthodes utilitaires
   getSelectedEmployee(): Employee | undefined {
-    return this.employees.find(e => e.id === this.selectedEmployeeId);
+    return this.employees?.find(e => e.id === this.selectedEmployeeId);
   }
 
   getSelectedTargetJob(): JobDescription | undefined {
-    return this.jobDescriptions.find(j => j.id === this.selectedTargetJobId);
+    return this.jobDescriptions?.find(j => j.id === this.selectedTargetJobId);
   }
 
   getPriorityColor(priority: string): string {
