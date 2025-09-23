@@ -59,6 +59,54 @@ class JobRecommendation(BaseModel):
     job_id: int
     job_title: str
     department: str
+
+    # Champs principaux
+    compatibility_score: float = Field(..., ge=0.0, le=1.0)
+    matching_skills: List[Dict[str, Any]] = []
+    missing_skills: List[Dict[str, Any]] = []
+    exceeding_skills: List[Dict[str, Any]] = []
+
+    # Scores détaillés
+    skill_match_score: float
+    experience_match_score: float
+    certification_match_score: float = 0.5  # valeur par défaut
+    overall_fit_score: float
+
+    # Recommandations d’action
+    readiness_level: str
+    recommended_actions: List[str] = []
+    estimated_transition_time: Optional[str] = None
+
+    # Potentiel carrière
+    growth_potential: float = Field(..., ge=0.0, le=1.0)
+    salary_potential: Optional[Dict[str, float]] = None
+
+    # Justification
+    recommendation_reason: str
+    confidence_level: float = Field(..., ge=0.0, le=1.0)
+
+    # Champs pour la cohérence et l’explicabilité
+    calculation_method: Optional[str] = "weighted_compatibility"
+    formula_applied: Dict[str, Any] = {
+        "overall": "(skills * 0.7) + (experience * 0.2) + (certifications * 0.1)",
+        "breakdown": {
+            "skills_contribution": 0.0,
+            "experience_contribution": 0.0,
+            "certification_contribution": 0.0,
+            "skills_weight": 0.7,
+            "experience_weight": 0.2,
+            "certification_weight": 0.1
+        }
+    }
+
+    # Nouveaux champs pour Angular
+    employee_experience_years: Optional[int] = 0
+    employee_certifications: Optional[int] = 0
+    required_certifications: Optional[int] = 0
+
+    job_id: int
+    job_title: str
+    department: str
     compatibility_score: float = Field(..., ge=0.0, le=1.0)
     
     # Analyse des compétences

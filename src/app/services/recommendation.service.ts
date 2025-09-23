@@ -41,6 +41,13 @@ export class RecommendationService {
     return this.http.get<TrainingRecommendationResponse>(url, { params }).pipe(
       map(response => {
         console.log('✅ Training recommendations response:', response);
+        
+        // Vérifier si le backend indique explicitement un fallback
+        if (response && (response as any).engine === 'fallback') {
+          console.log('🔄 Backend explicitly using fallback engine');
+          return this.processTrainingRecommendations(response);
+        }
+        
         // Appliquer les corrections de cohérence sur les recommandations reçues
         if (response && response.recommendations) {
           response.recommendations = response.recommendations.map(rec => 
@@ -77,13 +84,19 @@ export class RecommendationService {
       params = params.set('department', department);
     }
 
-    // CORRECTION: Utiliser la bonne route backend
     const url = `${this.apiUrl}/employee/${employeeId}/jobs`;
     console.log('💼 Calling job recommendations API:', url, 'with params:', params.toString());
 
     return this.http.get<JobRecommendationResponse>(url, { params }).pipe(
       map(response => {
         console.log('✅ Job recommendations response:', response);
+        
+        // Vérifier si le backend indique explicitement un fallback
+        if (response && (response as any).engine === 'fallback') {
+          console.log('🔄 Backend explicitly using fallback engine');
+          return this.processJobRecommendations(response);
+        }
+        
         // Appliquer les corrections de cohérence sur les recommandations reçues
         if (response && response.recommendations) {
           response.recommendations = response.recommendations.map(rec => 
@@ -123,109 +136,56 @@ export class RecommendationService {
   }
 
   /**
-   * Valider les données de recommandation
+   * Traiter les recommandations de formation avec validation robuste
    */
-  validateRecommendationData(data: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/validate`, data).pipe(
-      catchError(error => {
-        console.error('Error validating recommendation data:', error);
-        throw error;
-      })
-    );
-  }
-
-  /**
-   * Obtenir le statut des modèles ML
-   */
-  getModelStatus(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/models/status`).pipe(
-      catchError(error => {
-        console.error('Error getting model status:', error);
-        throw error;
-      })
-    );
-  }
-
-  /**
-   * Réentraîner les modèles ML
-   */
-  retrainModels(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/models/retrain`, {}).pipe(
-      catchError(error => {
-        console.error('Error retraining models:', error);
-        throw error;
-      })
-    );
-  }
-
-  /**
-   * Convertir un employé du format Angular vers le format API
-   */
-  convertEmployeeToRecommendationFormat(employee: any): EmployeeForRecommendation {
-    return {
-      id: employee.id,
-      name: employee.name,
-      position: employee.position,
-      department: employee.department || '',
-      hire_date: employee.hire_date,
-      email: employee.email,
-      phone: employee.phone,
-      location: employee.location,
-      skills: (employee.EmployeeSkills || employee.skills || []).map((skill: any) => ({
-        skill_id: skill.skill_id,
-        skill_name: skill.Skill?.name || skill.skill_name || '',
-        skill_type: skill.Skill?.type?.type_name || skill.skill_type,
-        current_level: skill.SkillLevel?.value || skill.current_level || 1,
-        level_name: skill.SkillLevel?.level_name || skill.level_name,
-        acquired_date: skill.acquired_date,
-        certification: skill.certification
-      }))
-    };
-  }
-
-  /**
-   * Convertir un poste du format Angular vers le format API
-   */
-  convertJobToRecommendationFormat(job: any): JobForRecommendation {
-    return {
-      id: job.id,
-      title: job.emploi || job.title,
-      department: job.filiere_activite || job.department,
-      family: job.famille,
-      experience_level: job.niveau_exp,
-      required_skills: (job.requiredSkills || job.required_skills || []).map((skill: any) => ({
-        skill_id: skill.skill_id,
-        skill_name: skill.Skill?.name || skill.skill_name || '',
-        skill_type: skill.Skill?.type?.type_name || skill.skill_type,
-        required_level: skill.SkillLevel?.value || skill.required_level || 3,
-        level_name: skill.SkillLevel?.level_name || skill.level_name,
-        is_mandatory: skill.is_mandatory !== false,
-        weight: skill.weight || 1.0
-      }))
-    };
-  }
-
-  /**
-   * Obtenir la couleur de priorité pour l'affichage
-   */
-  getPriorityColor(priority: string): string {
-    switch (priority) {
-      case 'Critique': return 'text-red-600 bg-red-50';
-      case 'Élevée': return 'text-orange-600 bg-orange-50';
-      case 'Moyenne': return 'text-yellow-600 bg-yellow-50';
-      case 'Faible': return 'text-green-600 bg-green-50';
-      default: return 'text-gray-600 bg-gray-50';
+  private processTrainingRecommendations(response: any): TrainingRecommendationResponse {
+    if (!response || !response.recommendations) {
+      return {
+        employee: { id: 0, name: '', position: '' },
+        target_job: { id: 0, title: '', department: '' },
+        recommendations: [],
+        total: 0,
+        calculation_method: 'fallback',
+        generated_at: new Date().toISOString()
+      };
     }
+
+    // Valider et corriger chaque recommandation
+    const validatedRecommendations = this.ensureArray(response.recommendations).map(rec => 
+      this.validateAndCorrectTrainingRecommendation(rec)
+    );
+
+    return {
+      ...response,
+      recommendations: validatedRecommendations,
+      total: validatedRecommendations.length
+    };
   }
 
   /**
-   * Obtenir la couleur de compatibilité
+   * Traiter les recommandations de poste avec validation robuste
    */
-  getCompatibilityColor(score: number): string {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    if (score >= 40) return 'text-orange-600';
-    return 'text-red-600';
+  private processJobRecommendations(response: any): JobRecommendationResponse {
+    if (!response || !response.recommendations) {
+      return {
+        employee: { id: 0, name: '', position: '' },
+        recommendations: [],
+        total: 0,
+        calculation_method: 'fallback',
+        generated_at: new Date().toISOString()
+      };
+    }
+
+    // Valider et corriger chaque recommandation
+    const validatedRecommendations = this.ensureArray(response.recommendations).map(rec => 
+      this.validateAndCorrectJobRecommendation(rec)
+    );
+
+    return {
+      ...response,
+      recommendations: validatedRecommendations,
+      total: validatedRecommendations.length
+    };
   }
 
   /**
@@ -234,9 +194,6 @@ export class RecommendationService {
   private validateAndCorrectTrainingRecommendation(rec: any): any {
     // Recalculer la probabilité hybride ML + heuristique
     const correctedProbability = this.calculateHybridSuccessProbability(rec);
-    
-    // Recalculer le ROI selon la formule documentée
-    const correctedROI = this.calculateTrainingROI(rec);
     
     // Recalculer la durée selon l'écart
     const correctedDuration = this.calculateTrainingDuration(rec.gap, rec.skill_type);
@@ -247,13 +204,11 @@ export class RecommendationService {
     return {
       ...rec,
       success_probability: correctedProbability,
-      roi_estimate: correctedROI,
       estimated_duration_hours: correctedDuration,
       justification: detailedJustification,
       calculation_method: 'hybrid_ml_heuristic',
       formula_applied: {
         probability: `ML_base(${rec.ml_probability || 0.6}) + heuristic_adjustments`,
-        roi: `(salary_improvement * 2 - training_cost) / training_cost`,
         duration: `base_duration(${rec.gap}) + complexity_factor + type_factor`
       }
     };
@@ -339,23 +294,6 @@ export class RecommendationService {
   }
 
   /**
-   * Calculer le ROI de formation selon la formule documentée
-   */
-  private calculateTrainingROI(rec: any): number {
-    // Amélioration salariale estimée (15% par niveau d'amélioration)
-    const salaryImprovement = rec.gap * 0.15 * (rec.estimated_current_salary || 40000);
-    
-    // Coût de formation
-    const trainingCost = rec.estimated_cost || this.calculateTrainingCost(rec.gap, rec.skill_type);
-    
-    // ROI sur 2 ans selon la formule documentée
-    const roi = (salaryImprovement * 2 - trainingCost) / trainingCost;
-    
-    console.log(`💰 ROI calculation: (${salaryImprovement} * 2 - ${trainingCost}) / ${trainingCost} = ${roi}`);
-    return Math.max(0.1, Math.round(roi * 100) / 100);
-  }
-
-  /**
    * Calculer la durée de formation selon l'écart et le type
    */
   private calculateTrainingDuration(gap: number, skillType: string): number {
@@ -382,10 +320,10 @@ export class RecommendationService {
   }
 
   /**
-   * Calculer le score de compatibilité poste avec pondération documentée
+   * Calculer le score de compatibilité poste avec pondération documentée (70/20/10)
    */
   private calculateJobCompatibilityScore(rec: any): any {
-    // Score compétences (70%)
+    // Score compétences (70%) - Validation robuste
     const skillScore = this.calculateSkillMatchScore(rec);
     
     // Score expérience (20%)
@@ -394,7 +332,7 @@ export class RecommendationService {
     // Score certifications (10%)
     const certificationScore = this.calculateCertificationMatchScore(rec);
     
-    // Score global selon la pondération documentée
+    // Score global selon la pondération documentée FIXE
     const overallScore = (skillScore * 0.7) + (experienceScore * 0.2) + (certificationScore * 0.1);
     
     console.log(`🎯 Compatibility calculation: skills(${skillScore}*0.7) + experience(${experienceScore}*0.2) + certs(${certificationScore}*0.1) = ${overallScore}`);
@@ -416,6 +354,82 @@ export class RecommendationService {
   }
 
   /**
+   * Calculer le score de correspondance des compétences avec validation robuste
+   */
+  private calculateSkillMatchScore(rec: any): number {
+    // Validation robuste - accepter tableau, objet, null
+    const matchingSkills = this.ensureArray(rec.matching_skills);
+    const missingSkills = this.ensureArray(rec.missing_skills);
+    const exceedingSkills = this.ensureArray(rec.exceeding_skills);
+    
+    const totalSkills = matchingSkills.length + missingSkills.length + exceedingSkills.length;
+    
+    if (totalSkills === 0) {
+      console.warn('⚠️ No skills data available for compatibility calculation');
+      return 0.5; // Score par défaut si pas de données
+    }
+    
+    // Score pondéré selon les niveaux
+    let weightedScore = 0;
+    let totalWeight = 0;
+    
+    // Traiter les compétences correspondantes
+    matchingSkills.forEach((skill: any) => {
+      const weight = this.safeGetNumber(skill.weight, 1.0);
+      const currentLevel = this.safeGetNumber(skill.current_level, 0);
+      const requiredLevel = this.safeGetNumber(skill.required_level, 1);
+      
+      const levelRatio = requiredLevel > 0 ? Math.min(1, currentLevel / requiredLevel) : 0;
+      weightedScore += levelRatio * weight;
+      totalWeight += weight;
+    });
+    
+    // Traiter les compétences dépassées (bonus)
+    exceedingSkills.forEach((skill: any) => {
+      const weight = this.safeGetNumber(skill.weight, 1.0);
+      weightedScore += 1.0 * weight; // Score complet pour les compétences dépassées
+      totalWeight += weight;
+    });
+    
+    // Les compétences manquantes contribuent au poids total mais pas au score
+    missingSkills.forEach((skill: any) => {
+      const weight = this.safeGetNumber(skill.weight, 1.0);
+      totalWeight += weight;
+    });
+    
+    const finalScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
+    
+    console.log(`🎯 Skill match calculation: weighted_score(${weightedScore}) / total_weight(${totalWeight}) = ${finalScore}`);
+    return Math.max(0, Math.min(1, finalScore));
+  }
+
+  /**
+   * Calculer le score de correspondance d'expérience
+   */
+  private calculateExperienceMatchScore(rec: any): number {
+    const employeeYears = this.safeGetNumber(rec.employee_experience_years, 2);
+    const requiredYears = this.getRequiredExperienceYears(rec.experience_level);
+    
+    if (employeeYears >= requiredYears) {
+      return 1.0;
+    }
+    
+    return Math.max(0, employeeYears / requiredYears);
+  }
+
+  /**
+   * Calculer le score de correspondance des certifications
+   */
+  private calculateCertificationMatchScore(rec: any): number {
+    const employeeCertifications = this.safeGetNumber(rec.employee_certifications, 0);
+    const requiredCertifications = this.safeGetNumber(rec.required_certifications, 0);
+    
+    if (requiredCertifications === 0) return 1.0;
+    
+    return Math.min(1.0, employeeCertifications / requiredCertifications);
+  }
+
+  /**
    * Générer une justification détaillée pour une recommandation de formation
    */
   private generateDetailedTrainingJustification(rec: any): string {
@@ -424,13 +438,11 @@ export class RecommendationService {
     const gap = rec.gap;
     const skillName = rec.skill_name;
     const duration = rec.estimated_duration_hours;
-    const cost = rec.estimated_cost || this.calculateTrainingCost(gap, rec.skill_type);
     const probability = Math.round((rec.success_probability || 0.6) * 100);
-    const roi = rec.roi_estimate || 1.0;
     
     return `Compétence ${skillName}: Niveau actuel ${currentLevel} → Niveau cible ${targetLevel} → Écart de ${gap} niveau(x). ` +
-           `Formation ${rec.training_type || 'mixte'} recommandée: ${duration}h, coût ${cost}€, ` +
-           `probabilité de succès ${probability}%, ROI estimé ${roi}x sur 2 ans. ` +
+           `Formation ${rec.training_type || 'mixte'} recommandée: ${duration}h, ` +
+           `probabilité de succès ${probability}%. ` +
            `Priorité ${rec.priority} basée sur l'importance métier et l'impact carrière.`;
   }
 
@@ -443,8 +455,8 @@ export class RecommendationService {
     const expScore = Math.round(compatibility.experience_score * 100);
     const certScore = Math.round(compatibility.certification_score * 100);
     
-    const matchingCount = rec.matching_skills?.length || 0;
-    const missingCount = rec.missing_skills?.length || 0;
+    const matchingCount = this.ensureArray(rec.matching_skills).length;
+    const missingCount = this.ensureArray(rec.missing_skills).length;
     
     return `Score de compatibilité ${overallScore}% calculé selon la pondération documentée: ` +
            `Compétences ${skillScore}% (poids 70%) + Expérience ${expScore}% (poids 20%) + Certifications ${certScore}% (poids 10%). ` +
@@ -512,9 +524,7 @@ export class RecommendationService {
     
     return skillGaps.map(gap => {
       const duration = this.calculateTrainingDuration(gap.gap, gap.skill_type);
-      const cost = this.calculateTrainingCost(gap.gap, gap.skill_type);
       const probability = this.calculateHeuristicSuccessProbability(gap);
-      const roi = this.calculateTrainingROI({ ...gap, estimated_cost: cost });
       
       return {
         ...gap,
@@ -522,10 +532,8 @@ export class RecommendationService {
         priority_score: gap.gap / 3,
         training_type: this.selectTrainingType(gap.gap, gap.skill_type),
         estimated_duration_hours: duration,
-        estimated_cost: cost,
         difficulty: gap.gap <= 1 ? 'Facile' : gap.gap <= 2 ? 'Moyen' : 'Difficile',
         success_probability: probability,
-        roi_estimate: roi,
         justification: this.generateDetailedTrainingJustification(gap),
         expected_benefits: this.getTrainingBenefits(gap.skill_type),
         calculation_method: 'heuristic'
@@ -543,16 +551,16 @@ export class RecommendationService {
         job_id: 1, 
         job_title: 'Développeur Senior', 
         department: 'Développement',
-        matching_skills: [{ skill_name: 'JavaScript', current_level: 3, required_level: 4 }],
-        missing_skills: [{ skill_name: 'React', current_level: 0, required_level: 3 }],
+        matching_skills: [{ skill_name: 'JavaScript', current_level: 3, required_level: 4, weight: 1.0 }],
+        missing_skills: [{ skill_name: 'React', current_level: 0, required_level: 3, weight: 1.0 }],
         exceeding_skills: []
       },
       { 
         job_id: 2, 
         job_title: 'Chef de Projet', 
         department: 'Management',
-        matching_skills: [{ skill_name: 'Leadership', current_level: 2, required_level: 3 }],
-        missing_skills: [{ skill_name: 'Gestion Budget', current_level: 0, required_level: 2 }],
+        matching_skills: [{ skill_name: 'Leadership', current_level: 2, required_level: 3, weight: 1.0 }],
+        missing_skills: [{ skill_name: 'Gestion Budget', current_level: 0, required_level: 2, weight: 1.0 }],
         exceeding_skills: []
       }
     ];
@@ -581,79 +589,62 @@ export class RecommendationService {
   }
 
   /**
-   * Calculer le coût de formation selon l'écart et le type
+   * Utilitaires pour la validation robuste des données
    */
-  private calculateTrainingCost(gap: number, skillType: string): number {
-    // Coût de base selon l'écart
-    const baseCost = gap * 300; // 300€ par niveau
-    
-    // Facteur selon le type
-    const typeFactors = {
-      'Technique': 1.3,
-      'Managériale': 1.1,
-      'Communication': 0.9,
-      'Analytique': 1.2
-    };
-    
-    const typeFactor = typeFactors[skillType as keyof typeof typeFactors] || 1.0;
-    
-    return Math.round(baseCost * typeFactor);
-  }
-
-  /**
-   * Calculer le score de correspondance des compétences
-   */
-  private calculateSkillMatchScore(rec: any): number {
-    const matchingSkills = rec.matching_skills || [];
-    const missingSkills = rec.missing_skills || [];
-    const totalSkills = matchingSkills.length + missingSkills.length;
-    
-    if (totalSkills === 0) return 0;
-    
-    // Score pondéré selon les niveaux
-    let weightedScore = 0;
-    let totalWeight = 0;
-    
-    matchingSkills.forEach((skill: any) => {
-      const weight = skill.weight || 1.0;
-      const levelRatio = Math.min(1, skill.current_level / skill.required_level);
-      weightedScore += levelRatio * weight;
-      totalWeight += weight;
-    });
-    
-    missingSkills.forEach((skill: any) => {
-      const weight = skill.weight || 1.0;
-      totalWeight += weight;
-      // Pas de contribution au score pour les compétences manquantes
-    });
-    
-    return totalWeight > 0 ? weightedScore / totalWeight : 0;
-  }
-
-  /**
-   * Calculer le score de correspondance d'expérience
-   */
-  private calculateExperienceMatchScore(rec: any): number {
-    const employeeYears = rec.employee_experience_years || 2;
-    const requiredYears = this.getRequiredExperienceYears(rec.experience_level);
-    
-    if (employeeYears >= requiredYears) {
-      return 1.0;
+  private ensureArray(value: any): any[] {
+    if (Array.isArray(value)) {
+      return value;
     }
-    
-    return Math.max(0, employeeYears / requiredYears);
+    if (value && typeof value === 'object') {
+      return [value];
+    }
+    if (value === null || value === undefined) {
+      return [];
+    }
+    return [];
+  }
+
+  private safeGetNumber(value: any, defaultValue: number): number {
+    if (typeof value === 'number' && !isNaN(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    return defaultValue;
+  }
+
+  private safeGetString(value: any, defaultValue: string): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+    return defaultValue;
   }
 
   /**
-   * Calculer le score de correspondance des certifications
+   * Obtenir la couleur de priorité pour l'affichage
    */
-  private calculateCertificationMatchScore(rec: any): number {
-    const employeeCertifications = rec.employee_certifications || 0;
-    const requiredCertifications = rec.required_certifications || 0;
-    
-    if (requiredCertifications === 0) return 1.0;
-    
-    return Math.min(1.0, employeeCertifications / requiredCertifications);
+  getPriorityColor(priority: string): string {
+    switch (priority) {
+      case 'Critique': return 'text-red-600 bg-red-50';
+      case 'Élevée': return 'text-orange-600 bg-orange-50';
+      case 'Moyenne': return 'text-yellow-600 bg-yellow-50';
+      case 'Faible': return 'text-green-600 bg-green-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  }
+
+  /**
+   * Obtenir la couleur de compatibilité
+   */
+  getCompatibilityColor(score: number): string {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    if (score >= 40) return 'text-orange-600';
+    return 'text-red-600';
   }
 
   /**

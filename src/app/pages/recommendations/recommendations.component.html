@@ -188,17 +188,6 @@
                 {{ (rec.success_probability * 100) | number:'1.0-0' }}%
               </span>
             </div>
-            <div *ngIf="rec.estimated_cost != null" class="flex justify-between">
-              <span class="text-gray-600">Coût estimé:</span>
-              <span class="font-medium">{{ rec.estimated_cost | currency:'EUR' }}</span>
-            </div>
-            <div *ngIf="rec.roi_estimate != null" class="flex justify-between">
-              <span class="text-gray-600">ROI estimé:</span>
-              <span class="font-medium" 
-                    [ngClass]="rec.roi_estimate >= 1.5 ? 'roi-positive' : rec.roi_estimate >= 0.8 ? 'roi-neutral' : 'roi-negative'">
-                {{ formatROI(rec.roi_estimate) }}
-              </span>
-            </div>
             
             <!-- Méthode de calcul -->
             <div *ngIf="rec.calculation_method" class="flex justify-between">
@@ -224,7 +213,6 @@
               <summary class="cursor-pointer text-gray-600 hover:text-gray-800">🔍 Formules de calcul</summary>
               <div class="mt-2 space-y-1 text-gray-700">
                 <p><strong>Probabilité:</strong> {{ rec.formula_applied.probability }}</p>
-                <p><strong>ROI:</strong> {{ rec.formula_applied.roi }}</p>
                 <p><strong>Durée:</strong> {{ rec.formula_applied.duration }}</p>
               </div>
             </details>
@@ -397,9 +385,8 @@
               <span class="text-gray-600">Potentiel de croissance:</span>
               <span class="ml-1 font-medium">{{ (rec.growth_potential * 100) | number:'1.0-0' }}%</span>
             </div>
-            <div *ngIf="rec.salary_potential" class="text-xs text-right">
-              <span class="text-gray-600">Salaire:</span>
-              <span class="ml-1 font-medium">{{ rec.salary_potential?.median | currency:'EUR':false:'1.0-0' }}</span>
+            <div class="text-right">
+              <div class="text-xs text-gray-500">Potentiel</div>
             </div>
           </div>
 

@@ -10,6 +10,8 @@ services:
       - /usr/src/app/node_modules
     depends_on:
       - db
+      - fastapi
+      - recommendation-api   # 👈 important
     command: nodemon
     env_file:
       - .env
@@ -20,13 +22,22 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     ports:
-      - "${FAST_API_PORT}:8000"
+      - "${FAST_API_PORT}:8000"     # 👈 variable corrigée
     volumes:
       - ./fast_api:/app
     environment:
       - PYTHONUNBUFFERED=1
-      
-      
+
+  recommendation-api:              # 👈 NOUVEAU
+    build:
+      context: ./recommendation_api  # adapte le chemin à ton repo
+      dockerfile: Dockerfile
+    container_name: recommendation_api
+    ports:
+      - "${RECOMMENDATION_API_PORT}:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+
   db:
     image: postgres:15
     ports:

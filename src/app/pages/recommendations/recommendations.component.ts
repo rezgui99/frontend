@@ -281,16 +281,6 @@ getJobRecommendations(): void {
   }
 
   /**
-   * Formater le ROI avec précision
-   */
-  formatROI(roi: number): string {
-    if (roi < 0) return `${roi.toFixed(2)}x (perte)`;
-    if (roi < 1) return `${roi.toFixed(2)}x (faible)`;
-    if (roi < 2) return `${roi.toFixed(2)}x (correct)`;
-    return `${roi.toFixed(2)}x (excellent)`;
-  }
-
-  /**
    * Obtenir l'icône selon la méthode de calcul
    */
   getCalculationMethodIcon(method: string): string {

@@ -99,18 +99,3 @@
   border-radius: 0.375rem;
   border-left: 3px solid #3b82f6;
 }
-
-.roi-positive {
-  color: #059669;
-  font-weight: 600;
-}
-
-.roi-negative {
-  color: #dc2626;
-  font-weight: 600;
-}
-
-.roi-neutral {
-  color: #6b7280;
-  font-weight: 500;
-}
