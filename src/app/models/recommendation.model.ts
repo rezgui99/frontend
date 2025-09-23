@@ -60,6 +60,20 @@ export interface TrainingRecommendation {
   suggested_resources: SuggestedResource[];
   success_probability: number;
   roi_estimate?: number;
+  
+  // Nouveaux champs pour la cohérence et l'explicabilité
+  calculation_method?: 'hybrid_ml_heuristic' | 'heuristic_fallback' | 'heuristic';
+  formula_applied?: {
+    probability: string;
+    roi: string;
+    duration: string;
+  };
+  ml_probability?: number;
+  heuristic_adjustments?: number;
+  employee_experience_years?: number;
+  employee_performance_score?: number;
+  has_certifications?: boolean;
+  estimated_current_salary?: number;
 }
 
 export interface SuggestedResource {
@@ -79,6 +93,7 @@ export interface JobRecommendation {
   exceeding_skills: SkillMatch[];
   skill_match_score: number;
   experience_match_score: number;
+  certification_match_score?: number;
   overall_fit_score: number;
   readiness_level: string;
   recommended_actions: string[];
@@ -87,6 +102,23 @@ export interface JobRecommendation {
   salary_potential?: SalaryPotential;
   recommendation_reason: string;
   confidence_level: number;
+  
+  // Nouveaux champs pour la cohérence et l'explicabilité
+  calculation_method?: 'weighted_compatibility' | 'heuristic_fallback' | 'heuristic';
+  formula_applied?: {
+    overall: string;
+    breakdown?: {
+      skills_contribution: number;
+      experience_contribution: number;
+      certification_contribution: number;
+      skills_weight: number;
+      experience_weight: number;
+      certification_weight: number;
+    };
+  };
+  employee_experience_years?: number;
+  employee_certifications?: number;
+  required_certifications?: number;
 }
 
 export interface SkillMatch {
@@ -133,6 +165,9 @@ export interface TrainingRecommendationResponse {
   };
   recommendations: TrainingRecommendation[];
   total: number;
+  calculation_method?: string;
+  generated_at?: string;
+  api_status?: 'ml_available' | 'fallback_used';
 }
 
 export interface JobRecommendationResponse {
@@ -143,4 +178,7 @@ export interface JobRecommendationResponse {
   };
   recommendations: JobRecommendation[];
   total: number;
+  calculation_method?: string;
+  generated_at?: string;
+  api_status?: 'ml_available' | 'fallback_used';
 }

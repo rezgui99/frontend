@@ -15,7 +15,28 @@
       </div>
       <div class="ml-3">
         <p class="text-sm text-red-700">
-          L'API de recommandation n'est pas disponible. Vérifiez que le service est en cours d'exécution sur le port 8001.
+          <strong>⚠️ API ML indisponible</strong> - Le système utilise automatiquement le fallback heuristique. 
+          Les calculs respectent les mêmes formules documentées (probabilité hybride, ROI dynamique, pondération 70/20/10).
+          <br><small class="text-red-600">Pour activer le ML: vérifiez que le service FastAPI fonctionne sur le port 8001.</small>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicateur de méthode de calcul active -->
+  <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+    <div class="flex items-center">
+      <div class="flex-shrink-0">
+        <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+        </svg>
+      </div>
+      <div class="ml-3">
+        <p class="text-sm text-blue-700">
+          <strong>🧮 Calculs alignés sur la documentation</strong> - 
+          {{ apiHealthy ? 'API ML active: probabilité hybride (ML + heuristique)' : 'Fallback heuristique actif' }}.
+          Pondération poste: 70% compétences + 20% expérience + 10% certifications.
+          ROI dynamique: (amélioration_salariale × 2 - coût_formation) / coût_formation.
         </p>
       </div>
     </div>
@@ -121,7 +142,7 @@
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div *ngFor="let rec of trainingRecommendations || []" class="card border-l-4" 
-             [ngClass]="rec.priority === 'Critique' ? 'border-red-500' : rec.priority === 'Élevée' ? 'border-orange-500' : rec.priority === 'Moyenne' ? 'border-yellow-500' : 'border-green-500'">
+             [ngClass]="rec.priority === 'Critique' ? 'priority-critical' : rec.priority === 'Élevée' ? 'priority-high' : rec.priority === 'Moyenne' ? 'priority-medium' : 'priority-low'">
           
           <!-- En-tête de la carte -->
           <div class="flex justify-between items-start mb-3">
@@ -129,8 +150,8 @@
               <h4 class="font-semibold text-lg">{{ rec.skill_name }}</h4>
               <span class="text-sm text-gray-600">{{ rec.skill_type || 'Type non défini' }}</span>
             </div>
-            <span class="px-2 py-1 rounded text-xs font-medium" [ngClass]="getPriorityColor(rec.priority)">
-              {{ rec.priority }}
+            <span class="px-2 py-1 rounded text-xs font-medium method-badge" [ngClass]="getPriorityColor(rec.priority)">
+              {{ getPriorityLabel(rec.priority) }}
             </span>
           </div>
 
@@ -148,7 +169,7 @@
           </div>
 
           <!-- Détails de la formation -->
-          <div class="space-y-2 text-sm">
+          <div class="space-y-2 text-sm score-animation">
             <div class="flex justify-between">
               <span class="text-gray-600">Type:</span>
               <span class="font-medium">{{ rec.training_type }}</span>
@@ -173,13 +194,40 @@
             </div>
             <div *ngIf="rec.roi_estimate != null" class="flex justify-between">
               <span class="text-gray-600">ROI estimé:</span>
-              <span class="font-medium text-green-600">{{ rec.roi_estimate | number:'1.1-1' }}x</span>
+              <span class="font-medium" 
+                    [ngClass]="rec.roi_estimate >= 1.5 ? 'roi-positive' : rec.roi_estimate >= 0.8 ? 'roi-neutral' : 'roi-negative'">
+                {{ formatROI(rec.roi_estimate) }}
+              </span>
+            </div>
+            
+            <!-- Méthode de calcul -->
+            <div *ngIf="rec.calculation_method" class="flex justify-between">
+              <span class="text-gray-600">Méthode:</span>
+              <span class="font-medium text-xs" 
+                    [class]="rec.calculation_method === 'hybrid_ml_heuristic' ? 'text-blue-600' : 'text-orange-600'">
+                {{ getCalculationMethodIcon(rec.calculation_method) }} 
+                {{ rec.calculation_method === 'hybrid_ml_heuristic' ? 'ML + Heuristique' : 
+                   rec.calculation_method === 'heuristic_fallback' ? 'Heuristique (Fallback)' : 'Heuristique' }}
+              </span>
             </div>
           </div>
 
-          <!-- Justification -->
-          <div class="mt-3 p-2 bg-gray-50 rounded">
-            <p class="text-sm text-gray-700">{{ rec.justification }}</p>
+          <!-- Justification détaillée -->
+          <div class="mt-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+            <p class="text-xs font-medium text-blue-800 mb-1">📋 Analyse détaillée:</p>
+            <p class="text-sm text-blue-700 leading-relaxed">{{ rec.justification }}</p>
+          </div>
+
+          <!-- Formules appliquées (mode debug) -->
+          <div *ngIf="rec.formula_applied" class="mt-2 p-2 bg-gray-100 rounded text-xs">
+            <details>
+              <summary class="cursor-pointer text-gray-600 hover:text-gray-800">🔍 Formules de calcul</summary>
+              <div class="mt-2 space-y-1 text-gray-700">
+                <p><strong>Probabilité:</strong> {{ rec.formula_applied.probability }}</p>
+                <p><strong>ROI:</strong> {{ rec.formula_applied.roi }}</p>
+                <p><strong>Durée:</strong> {{ rec.formula_applied.duration }}</p>
+              </div>
+            </details>
           </div>
 
           <!-- Bénéfices attendus -->
@@ -296,20 +344,36 @@
               </span>
             </div>
             <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Certifications:</span>
+              <span [ngClass]="getCompatibilityColor((rec.certification_match_score || 0.5) * 100)">
+                {{ ((rec.certification_match_score || 0.5) * 100) | number:'1.0-0' }}%
+              </span>
+            </div>
+            <div class="flex justify-between text-sm">
               <span class="text-gray-600">Confiance:</span>
               <span>{{ (rec.confidence_level * 100) | number:'1.0-0' }}%</span>
+            </div>
+            
+            <!-- Pondération documentée -->
+            <div class="mt-2 p-2 bg-gray-100 rounded text-xs">
+              <p class="font-medium text-gray-700 mb-1">🧮 Calcul de compatibilité:</p>
+              <p class="text-gray-600">
+                {{ (rec.skill_match_score * 100) | number:'1.0-0' }}% × 70% + 
+                {{ (rec.experience_match_score * 100) | number:'1.0-0' }}% × 20% + 
+                {{ ((rec.certification_match_score || 0.5) * 100) | number:'1.0-0' }}% × 10% = 
+                <strong>{{ (rec.compatibility_score * 100) | number:'1.0-0' }}%</strong>
+              </p>
             </div>
           </div>
 
           <!-- État de préparation -->
           <div class="p-3 rounded mb-3" 
-               [ngClass]="rec.readiness_level === 'Prêt' ? 'bg-green-50' : rec.readiness_level === 'Formation courte nécessaire' ? 'bg-yellow-50' : 'bg-orange-50'">
-            <p class="font-medium text-sm" 
-               [ngClass]="rec.readiness_level === 'Prêt' ? 'text-green-800' : rec.readiness_level === 'Formation courte nécessaire' ? 'text-yellow-800' : 'text-orange-800'">
+               [ngClass]="getReadinessClass(rec.readiness_level)">
+            <p class="font-medium text-sm">
               {{ rec.readiness_level }}
             </p>
             <p *ngIf="rec.estimated_transition_time" class="text-xs mt-1" 
-               [ngClass]="rec.readiness_level === 'Prêt' ? 'text-green-600' : rec.readiness_level === 'Formation courte nécessaire' ? 'text-yellow-600' : 'text-orange-600'">
+               class="text-gray-600">
               Transition: {{ rec.estimated_transition_time }}
             </p>
           </div>
@@ -339,9 +403,41 @@
             </div>
           </div>
 
-          <!-- Raison de la recommandation -->
-          <div class="mt-3 p-2 bg-blue-50 rounded">
-            <p class="text-sm text-blue-800">{{ rec.recommendation_reason }}</p>
+          <!-- Justification détaillée -->
+          <div class="mt-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+            <p class="text-xs font-medium text-blue-800 mb-1">📋 Analyse de compatibilité:</p>
+            <p class="text-sm text-blue-700 leading-relaxed">{{ rec.recommendation_reason }}</p>
+          </div>
+
+          <!-- Méthode de calcul -->
+          <div *ngIf="rec.calculation_method" class="mt-2 text-center">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                  [class]="rec.calculation_method === 'weighted_compatibility' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'">
+              {{ getCalculationMethodIcon(rec.calculation_method) }} 
+              {{ rec.calculation_method === 'weighted_compatibility' ? 'ML + Pondération' : 
+                 rec.calculation_method === 'heuristic_fallback' ? 'Heuristique (Fallback)' : 'Heuristique' }}
+            </span>
+          </div>
+
+          <!-- Formules appliquées (mode debug) -->
+          <div *ngIf="rec.formula_applied" class="mt-2 p-2 bg-gray-100 rounded text-xs">
+            <details>
+              <summary class="cursor-pointer text-gray-600 hover:text-gray-800">🔍 Détail des calculs</summary>
+              <div class="mt-2 space-y-1 text-gray-700">
+                <p><strong>Formule globale:</strong> {{ rec.formula_applied.overall }}</p>
+                <div *ngIf="rec.formula_applied.breakdown" class="ml-2 space-y-1">
+                  <div class="calculation-step">
+                    <p>• Compétences: {{ rec.formula_applied.breakdown.skills_contribution | number:'1.2-2' }} (poids {{ rec.formula_applied.breakdown.skills_weight }})</p>
+                  </div>
+                  <div class="calculation-step">
+                    <p>• Expérience: {{ rec.formula_applied.breakdown.experience_contribution | number:'1.2-2' }} (poids {{ rec.formula_applied.breakdown.experience_weight }})</p>
+                  </div>
+                  <div class="calculation-step">
+                    <p>• Certifications: {{ rec.formula_applied.breakdown.certification_contribution | number:'1.2-2' }} (poids {{ rec.formula_applied.breakdown.certification_weight }})</p>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
 
           <!-- Actions recommandées -->

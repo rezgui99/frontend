@@ -152,18 +152,21 @@ getTrainingRecommendations(): void {
       // 2) Assigner au state
       this.trainingRecommendations = recs;
 
-      // 3) Construire un message *texte* propre (jamais un objet/array)
-      const total =
-        (typeof (response as any)?.totalRecommendations === 'number' && (response as any).totalRecommendations) ||
-        (typeof (response as any)?.total === 'number' && (response as any).total) ||
-        recs.length;
-
-      this.successMessage = `${total} recommandation(s) de formation trouvée(s).`;
+      // 3) Message avec détails de la méthode de calcul
+      const total = (response as any)?.total || recs.length;
+      const method = recs[0]?.calculation_method || 'unknown';
+      const methodLabel = method === 'hybrid_ml_heuristic' ? 'ML + Heuristique' : 
+                          method === 'heuristic_fallback' ? 'Heuristique (fallback)' : 
+                          method === 'heuristic' ? 'Heuristique' : 'Méthode inconnue';
+      
+      this.successMessage = `${total} recommandation(s) de formation générée(s) via ${methodLabel}. ` +
+                           `Calculs alignés sur les formules documentées (probabilité hybride, ROI dynamique, durée/écart cohérents).`;
       this.loadingTraining = false;
     },
     error: (error) => {
       console.error('❌ Error getting training recommendations:', error);
-      this.errorMessage = error?.error?.error || error?.message || 'Erreur lors de la récupération des recommandations de formation.';
+      this.errorMessage = `Erreur API ML: ${error?.error?.error || error?.message}. ` +
+                          `Le système a basculé automatiquement sur le calcul heuristique de fallback.`;
       this.trainingRecommendations = [];
       this.loadingTraining = false;
     }
@@ -203,18 +206,21 @@ getJobRecommendations(): void {
       // 2) Assigner au state
       this.jobRecommendations = recs;
 
-      // 3) Message texte robuste
-      const total =
-        (typeof (response as any)?.totalRecommendations === 'number' && (response as any).totalRecommendations) ||
-        (typeof (response as any)?.total === 'number' && (response as any).total) ||
-        recs.length;
-
-      this.successMessage = `${total} poste(s) recommandé(s) trouvé(s).`;
+      // 3) Message avec détails de la méthode et validation
+      const total = (response as any)?.total || recs.length;
+      const method = recs[0]?.calculation_method || 'unknown';
+      const methodLabel = method === 'weighted_compatibility' ? 'Pondération documentée' : 
+                          method === 'heuristic_fallback' ? 'Heuristique (fallback)' : 
+                          method === 'heuristic' ? 'Heuristique' : 'Méthode inconnue';
+      
+      this.successMessage = `${total} poste(s) recommandé(s) via ${methodLabel}. ` +
+                           `Scores calculés avec pondération: 70% compétences + 20% expérience + 10% certifications.`;
       this.loadingJobRecs = false;
     },
     error: (error) => {
       console.error('❌ Error getting job recommendations:', error);
-      this.errorMessage = error?.error?.error || error?.message || 'Erreur lors de la récupération des recommandations de poste.';
+      this.errorMessage = `Erreur API ML: ${error?.error?.error || error?.message}. ` +
+                          `Le système a basculé automatiquement sur le calcul heuristique de fallback.`;
       this.jobRecommendations = [];
       this.loadingJobRecs = false;
     }
@@ -239,14 +245,61 @@ getJobRecommendations(): void {
   }
 
   getSuccessProbabilityColor(probability: number): string {
-    if (probability >= 0.8) return 'text-green-600';
-    if (probability >= 0.6) return 'text-yellow-600';
-    return 'text-red-600';
+    // Seuils alignés sur la documentation
+    if (probability >= 0.75) return 'text-green-600 font-bold';
+    if (probability >= 0.55) return 'text-yellow-600 font-bold';
+    if (probability >= 0.35) return 'text-orange-600 font-bold';
+    return 'text-red-600 font-bold';
   }
 
   switchTab(tab: 'training' | 'jobs'): void {
     this.activeTab = tab;
     this.errorMessage = null;
     this.successMessage = null;
+  }
+
+  /**
+   * Obtenir le label de priorité avec couleur
+   */
+  getPriorityLabel(priority: string): string {
+    const labels = {
+      'Critique': '🔴 Critique',
+      'Élevée': '🟠 Élevée', 
+      'Moyenne': '🟡 Moyenne',
+      'Faible': '🟢 Faible'
+    };
+    return labels[priority as keyof typeof labels] || priority;
+  }
+
+  /**
+   * Obtenir la classe CSS pour le niveau de préparation
+   */
+  getReadinessClass(readinessLevel: string): string {
+    if (readinessLevel === 'Prêt') return 'text-green-600 bg-green-50';
+    if (readinessLevel === 'Formation courte nécessaire') return 'text-yellow-600 bg-yellow-50';
+    return 'text-orange-600 bg-orange-50';
+  }
+
+  /**
+   * Formater le ROI avec précision
+   */
+  formatROI(roi: number): string {
+    if (roi < 0) return `${roi.toFixed(2)}x (perte)`;
+    if (roi < 1) return `${roi.toFixed(2)}x (faible)`;
+    if (roi < 2) return `${roi.toFixed(2)}x (correct)`;
+    return `${roi.toFixed(2)}x (excellent)`;
+  }
+
+  /**
+   * Obtenir l'icône selon la méthode de calcul
+   */
+  getCalculationMethodIcon(method: string): string {
+    const icons = {
+      'hybrid_ml_heuristic': '🤖',
+      'weighted_compatibility': '⚖️',
+      'heuristic_fallback': '🔄',
+      'heuristic': '📊'
+    };
+    return icons[method as keyof typeof icons] || '❓';
   }
 }

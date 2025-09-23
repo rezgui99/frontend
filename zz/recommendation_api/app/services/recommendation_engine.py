@@ -249,10 +249,14 @@ class RecommendationEngine:
         # Score d'expérience
         experience_score = self._calculate_experience_match(employee, job)
         
-        # Score global
+        # Score de certifications (nouveau selon documentation)
+        certification_score = self._calculate_certification_match(employee, job)
+        
+        # Score global selon la pondération documentée: 70% + 20% + 10%
         overall_score = (
-            skill_score * settings.SKILL_WEIGHT +
-            experience_score * settings.EXPERIENCE_WEIGHT
+            skill_score * 0.7 +           # 70% compétences
+            experience_score * 0.2 +      # 20% expérience  
+            certification_score * 0.1     # 10% certifications
         )
         
         # Niveau de confiance basé sur la quantité de données
@@ -262,10 +266,17 @@ class RecommendationEngine:
             'overall_score': round(overall_score, 3),
             'skill_score': round(skill_score, 3),
             'experience_score': round(experience_score, 3),
+            'certification_score': round(certification_score, 3),
             'matching_skills': matching_skills,
             'missing_skills': missing_skills,
             'exceeding_skills': exceeding_skills,
-            'confidence': round(confidence, 3)
+            'confidence': round(confidence, 3),
+            'calculation_breakdown': {
+                'skills_contribution': round(skill_score * 0.7, 3),
+                'experience_contribution': round(experience_score * 0.2, 3),
+                'certification_contribution': round(certification_score * 0.1, 3),
+                'weights_applied': {'skills': 0.7, 'experience': 0.2, 'certifications': 0.1}
+            }
         }
 
     def _calculate_experience_match(self, employee: Employee, job: JobDescription) -> float:
@@ -286,6 +297,32 @@ class RecommendationEngine:
             return 1.0
         else:
             return max(0.0, employee_years / required_years)
+
+    def _calculate_certification_match(self, employee: Employee, job: JobDescription) -> float:
+        """Calculer le score de correspondance des certifications"""
+        
+        # Compter les certifications de l'employé
+        employee_certifications = sum(1 for skill in employee.skills if skill.certification and skill.certification.strip())
+        
+        # Estimer les certifications requises (heuristique basée sur le niveau du poste)
+        required_certifications = 0
+        if job.experience_level in ['Senior', 'Expert']:
+            required_certifications = 2
+        elif job.experience_level == 'Confirmé':
+            required_certifications = 1
+        
+        # Score basé sur le ratio certifications possédées / requises
+        if required_certifications == 0:
+            return 1.0  # Pas de certification requise
+        
+        certification_ratio = min(1.0, employee_certifications / required_certifications)
+        
+        # Bonus pour les certifications supplémentaires
+        if employee_certifications > required_certifications:
+            bonus = min(0.2, (employee_certifications - required_certifications) * 0.1)
+            certification_ratio = min(1.0, certification_ratio + bonus)
+        
+        return certification_ratio
 
     def _predict_training_effectiveness(self, employee: Employee, skill_id: int, target_level: int) -> float:
         """Prédire l'efficacité d'une formation"""
@@ -630,32 +667,66 @@ class RecommendationEngine:
 
     def _generate_recommendation_reason(self, compatibility_analysis: Dict) -> str:
         """Générer une raison pour la recommandation de poste"""
-        score = compatibility_analysis['overall_score']
+        score = compatibility_analysis['overall_score'] * 100
+        skill_score = compatibility_analysis['skill_score'] * 100
+        exp_score = compatibility_analysis['experience_score'] * 100
+        cert_score = compatibility_analysis['certification_score'] * 100
+        
         matching_count = len(compatibility_analysis['matching_skills'])
         missing_count = len(compatibility_analysis['missing_skills'])
+        exceeding_count = len(compatibility_analysis['exceeding_skills'])
         
-        if score >= 0.8:
-            return f"Excellent match avec {matching_count} compétences correspondantes. Candidat idéal pour ce poste."
-        elif score >= 0.6:
-            return f"Bon match avec {matching_count} compétences correspondantes. {missing_count} compétence(s) à développer."
+        breakdown = compatibility_analysis['calculation_breakdown']
+        
+        reason = f"Score de compatibilité {score:.0f}% calculé selon la pondération documentée: " \
+                f"Compétences {skill_score:.0f}% (contribution {breakdown['skills_contribution']:.2f}) + " \
+                f"Expérience {exp_score:.0f}% (contribution {breakdown['experience_contribution']:.2f}) + " \
+                f"Certifications {cert_score:.0f}% (contribution {breakdown['certification_contribution']:.2f}). "
+        
+        if score >= 80:
+            reason += f"Excellent profil avec {matching_count} compétence(s) correspondante(s)"
+            if exceeding_count > 0:
+                reason += f" et {exceeding_count} compétence(s) supérieure(s)"
+            reason += ". Candidat idéal pour ce poste."
+        elif score >= 60:
+            reason += f"Bon profil avec {matching_count} compétence(s) correspondante(s). "
+            if missing_count > 0:
+                reason += f"{missing_count} compétence(s) à développer via formation ciblée."
         else:
-            return f"Match partiel. {missing_count} compétences importantes à acquérir avant de postuler."
+            reason += f"Profil en développement. {missing_count} compétence(s) importantes à acquérir " \
+                     f"via plan de formation avant candidature."
+        
+        return reason
 
     def _calculate_training_roi(self, gap: Dict, training: Dict) -> float:
         """Calculer le ROI estimé de la formation"""
+        # ROI selon la formule documentée dans la soutenance
+        gap_size = gap['gap_size']
+        training_cost = training.get('cost', 500 + gap_size * 200)
         
-        # ROI basé sur l'amélioration de performance attendue
-        performance_improvement = gap['gap_size'] * 0.15  # 15% par niveau
+        # Amélioration salariale estimée (12% par niveau selon doc)
+        salary_base = 40000  # Salaire de référence
+        salary_improvement_per_year = salary_base * 0.12 * gap_size
         
-        # Coût de la formation
-        training_cost = training.get('cost', 1000)
+        # Bénéfice sur 2 ans moins le coût de formation
+        total_benefit = salary_improvement_per_year * 2
+        net_benefit = total_benefit - training_cost
         
-        # Bénéfice estimé (amélioration salariale potentielle)
-        salary_improvement = performance_improvement * 2000  # 2000€ par 15% d'amélioration
+        # ROI = bénéfice net / investissement
+        roi = net_benefit / training_cost if training_cost > 0 else 0
         
-        # ROI sur 2 ans
-        roi = (salary_improvement * 2 - training_cost) / training_cost
-        return max(0.0, round(roi, 2))
+        # Appliquer les ajustements selon le type de compétence
+        skill_type = gap.get('skill_type', 'Technique')
+        type_multiplier = {
+            'Technique': 1.2,
+            'Managériale': 1.1, 
+            'Communication': 0.9,
+            'Analytique': 1.0
+        }.get(skill_type, 1.0)
+        
+        final_roi = roi * type_multiplier
+        
+        return max(0.1, round(final_roi, 2))
 
     def _load_training_catalog(self) -> Dict[str, Dict]:
         """Charger le catalogue de formations"""

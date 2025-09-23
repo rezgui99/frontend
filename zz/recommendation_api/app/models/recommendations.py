@@ -46,6 +46,12 @@ class TrainingRecommendation(BaseModel):
     success_probability: float = Field(..., ge=0.0, le=1.0)
     roi_estimate: Optional[float] = None
     
+    # Nouveaux champs pour la cohérence et l'explicabilité
+    calculation_method: Optional[str] = "hybrid_ml_heuristic"
+    formula_applied: Optional[Dict[str, Any]] = None
+    ml_probability: Optional[float] = None
+    heuristic_adjustments: Optional[float] = None
+    
     class Config:
         use_enum_values = True
 
@@ -63,6 +69,7 @@ class JobRecommendation(BaseModel):
     # Scores détaillés
     skill_match_score: float
     experience_match_score: float
+    certification_match_score: Optional[float] = 0.5
     overall_fit_score: float
     
     # Recommandations d'action
@@ -77,6 +84,11 @@ class JobRecommendation(BaseModel):
     # Justification
     recommendation_reason: str
     confidence_level: float = Field(..., ge=0.0, le=1.0)
+    
+    # Nouveaux champs pour la cohérence et l'explicabilité
+    calculation_method: Optional[str] = "weighted_compatibility"
+    formula_applied: Optional[Dict[str, Any]] = None
+    calculation_breakdown: Optional[Dict[str, Any]] = None
 
 class SkillGapAnalysis(BaseModel):
     """Analyse détaillée des écarts de compétences"""
