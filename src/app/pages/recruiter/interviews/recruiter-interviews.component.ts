@@ -3,10 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { InterviewService } from '../../../services/interview.service';
 import { RecruiterApplicationsService } from '../../../services/recruiter-applications.service';
-import { 
-  Interview, 
-  InterviewFilters, 
-  InterviewStatistics, 
+import {
+  Interview,
+  InterviewFilters,
+  InterviewStatistics,
   CreateInterviewRequest,
   InterviewsResponse,
   AvailableApplication,
@@ -25,13 +25,13 @@ import {
 export class RecruiterInterviewsComponent implements OnInit {
   interviews: Interview[] = [];
   statistics: InterviewStatistics | null = null;
-  
+
   loading = false;
   scheduling = false;
-  
+
   filters: InterviewFilters = {
     page: 1,
-    limit: 20
+    limit: 2
   };
 
   pagination = {
@@ -41,10 +41,10 @@ export class RecruiterInterviewsComponent implements OnInit {
     totalPages: 0
   };
 
-  // Modal states
+  // --- Modals & forms ---
   showScheduleModal = false;
   scheduleForm: FormGroup;
-  
+
   // Modals pour les documents
   showInterviewCoverLetterModal = false;
   showInterviewDetailsModal = false;
@@ -52,10 +52,16 @@ export class RecruiterInterviewsComponent implements OnInit {
   selectedInterviewDetails: Interview | null = null;
   selectedApplicationForSchedule: AvailableApplication | null = null;
 
+  // Modal Terminer l'entretien
+  showCompleteInterviewModal = false;
+  completeForm: FormGroup;
+  completing = false;
+  selectedInterviewToComplete: Interview | null = null;
+
   // Applications disponibles pour programmer des entretiens
   availableApplications: AvailableApplication[] = [];
   loadingApplications = false;
-  
+
   // Options
   statusOptions: { value: InterviewStatus; label: string }[] = [
     { value: 'scheduled', label: 'Programmé' },
@@ -92,6 +98,12 @@ export class RecruiterInterviewsComponent implements OnInit {
       meeting_link: [''],
       notes: ['']
     });
+
+    this.completeForm = this.formBuilder.group({
+      score: [null, [Validators.required, Validators.min(0), Validators.max(100)]],
+      feedback: ['', [Validators.required, Validators.minLength(5)]],
+      decision: ['pass', Validators.required] // 'pass' | 'fail' (InterviewDecision)
+    });
   }
 
   ngOnInit(): void {
@@ -100,9 +112,10 @@ export class RecruiterInterviewsComponent implements OnInit {
     this.loadInterviewTypeLabels();
   }
 
+  // ====== Data loading ======
   loadInterviews(): void {
     this.loading = true;
-    
+
     this.interviewService.getInterviews(this.filters).subscribe({
       next: (response: InterviewsResponse | Interview[]) => {
         if (Array.isArray(response)) {
@@ -175,7 +188,7 @@ export class RecruiterInterviewsComponent implements OnInit {
 
   loadAvailableApplications(): void {
     this.loadingApplications = true;
-    
+
     this.recruiterApplicationsService.getAvailableApplicationsForInterview().subscribe({
       next: (applications: AvailableApplication[]) => {
         this.availableApplications = applications || [];
@@ -190,6 +203,7 @@ export class RecruiterInterviewsComponent implements OnInit {
     });
   }
 
+  // ====== Filters / pagination ======
   onFilterChange(): void {
     this.filters.page = 1;
     this.loadInterviews();
@@ -218,21 +232,21 @@ export class RecruiterInterviewsComponent implements OnInit {
     return Math.min(this.pagination.page * this.pagination.limit, this.pagination.total);
   }
 
+  // ====== Schedule interview ======
   onApplicationSelect(): void {
     const applicationId = this.scheduleForm.get('application_id')?.value;
     if (applicationId) {
-      this.selectedApplicationForSchedule = this.availableApplications.find(
-        app => app.id === parseInt(applicationId)
-      ) || null;
+      this.selectedApplicationForSchedule =
+        this.availableApplications.find(app => app.id === parseInt(applicationId, 10)) || null;
     }
   }
 
   onScheduleSubmit(): void {
     if (this.scheduleForm.valid) {
       this.scheduling = true;
-      
+
       const interviewData: CreateInterviewRequest = this.scheduleForm.value;
-      
+
       this.interviewService.scheduleInterview(interviewData).subscribe({
         next: () => {
           this.closeScheduleModal();
@@ -251,7 +265,7 @@ export class RecruiterInterviewsComponent implements OnInit {
 
   onInterviewTypeChange(): void {
     const interviewType = this.scheduleForm.get('interview_type')?.value;
-    
+
     // Réinitialiser les champs selon le type
     if (interviewType === 'phone') {
       this.scheduleForm.patchValue({
@@ -278,10 +292,10 @@ export class RecruiterInterviewsComponent implements OnInit {
     });
   }
 
-  // Interview actions
+  // ====== Interview actions ======
   confirmInterview(interview: Interview): void {
     if (!interview.id) return;
-    
+
     this.interviewService.updateInterview(interview.id, { status: 'confirmed' }).subscribe({
       next: () => {
         this.loadInterviews();
@@ -295,7 +309,7 @@ export class RecruiterInterviewsComponent implements OnInit {
 
   cancelInterview(interview: Interview): void {
     if (!interview.id) return;
-    
+
     const reason = prompt('Raison de l\'annulation:');
     if (reason) {
       this.interviewService.cancelInterview(interview.id, reason).subscribe({
@@ -313,10 +327,10 @@ export class RecruiterInterviewsComponent implements OnInit {
 
   showRescheduleModal(interview: Interview): void {
     if (!interview.id) return;
-    
+
     const newDate = prompt('Nouvelle date et heure (YYYY-MM-DD HH:MM):');
     const reason = prompt('Raison de la reprogrammation:');
-    
+
     if (newDate && reason) {
       this.interviewService.rescheduleInterview(interview.id, {
         new_scheduled_date: newDate,
@@ -333,37 +347,51 @@ export class RecruiterInterviewsComponent implements OnInit {
     }
   }
 
-  showCompleteModal(interview: Interview): void {
-    if (!interview.id) return;
-    
-    const score = prompt('Score de l\'entretien (0-100):');
-    const feedback = prompt('Feedback pour le candidat:');
-    const decision = confirm('Candidat retenu ?') ? 'pass' : 'fail';
-    
-    if (score && feedback) {
-      this.interviewService.completeInterview(interview.id, {
-        score: parseInt(score),
-        feedback,
-        decision
-      }).subscribe({
-        next: () => {
-          this.loadInterviews();
-          this.loadStatistics();
-        },
-        error: (error) => {
-          console.error('Error completing interview:', error);
-          this.errorMessage = error.message || 'Erreur lors de la finalisation de l\'entretien';
-        }
-      });
-    }
+  // ====== Terminer l'entretien (nouveau modal) ======
+  openCompleteModal(interview: Interview): void {
+    if (!interview?.id) { return; }
+    this.selectedInterviewToComplete = interview;
+    this.completeForm.reset({
+      score: interview?.score ?? null,
+      feedback: interview?.feedback ?? '',
+      decision: 'pass'
+    });
+    this.showCompleteInterviewModal = true;
   }
 
-  showEditModal(interview: Interview): void {
-    console.log('Edit interview:', interview);
-    // TODO: Implémenter modal d'édition complet
+  closeCompleteModal(): void {
+    this.showCompleteInterviewModal = false;
+    this.selectedInterviewToComplete = null;
   }
 
-  // Document methods
+  submitComplete(): void {
+    if (!this.selectedInterviewToComplete?.id || this.completeForm.invalid) return;
+    this.completing = true;
+
+    const payload: { score: number; feedback: string; decision: InterviewDecision } = {
+      score: Number(this.completeForm.value.score),
+      feedback: String(this.completeForm.value.feedback).trim(),
+      decision: this.completeForm.value.decision as InterviewDecision
+    };
+
+    this.interviewService.completeInterview(this.selectedInterviewToComplete.id, payload).subscribe({
+      next: () => {
+        this.completing = false;
+        this.closeCompleteModal();
+        this.loadInterviews();
+        this.loadStatistics();
+      },
+      error: (error) => {
+        console.error('Error completing interview:', error);
+        this.errorMessage = error.message || 'Erreur lors de la finalisation de l\'entretien';
+        this.completing = false;
+      }
+    });
+  }
+
+ 
+
+  // ====== Document methods ======
   showCoverLetterForInterview(interview: Interview): void {
     this.selectedInterviewForCoverLetter = interview;
     this.showInterviewCoverLetterModal = true;
@@ -401,7 +429,7 @@ export class RecruiterInterviewsComponent implements OnInit {
     });
   }
 
-  // Utility methods
+  // ====== Utils ======
   getStatusClass(status: string): string {
     const classes: { [key: string]: string } = {
       'scheduled': 'bg-blue-100 text-blue-800',
@@ -434,7 +462,7 @@ export class RecruiterInterviewsComponent implements OnInit {
     if (score >= 80) return 'text-green-600';
     if (score >= 60) return 'text-yellow-600';
     return 'text-red-600';
-  }
+    }
 
   formatDate(dateString?: string): string {
     if (!dateString) return '';
@@ -481,7 +509,7 @@ export class RecruiterInterviewsComponent implements OnInit {
     return labels[type] || type;
   }
 
-  // Getters pour les statistiques avec protection null
+  // Getters statistiques
   get totalInterviews(): number {
     return this.statistics?.total_interviews || 0;
   }
@@ -502,7 +530,6 @@ export class RecruiterInterviewsComponent implements OnInit {
     return this.statistics?.average_score || 0;
   }
 
-  // Méthodes pour accéder aux statistiques de manière sécurisée
   getStatusCount(status: InterviewStatus): number {
     return this.statusBreakdown[status] || 0;
   }

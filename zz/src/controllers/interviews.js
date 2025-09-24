@@ -535,12 +535,14 @@ const cancelInterview = async (req, res) => {
   }
 };
 
-// Complete interview
+// Complete interview - FONCTION CORRIGÉE
 const completeInterview = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
     const { score, feedback, decision } = req.body;
+    
+    console.log('📝 Complete interview request:', { score, feedback, decision });
     
     const interview = await Interview.findByPk(req.params.id, {
       include: [
@@ -561,39 +563,275 @@ const completeInterview = async (req, res) => {
       return res.status(404).json({ error: 'Entretien non trouvé' });
     }
 
+    // Validation stricte de la décision
+    const validDecisions = ['pass', 'fail', 'pending'];
+    const finalDecision = validDecisions.includes(decision) ? decision : 'pending';
+    
+    console.log('✅ Final decision:', finalDecision);
+
+    // Mettre à jour l'entretien
     await interview.update({
       status: 'completed',
       score: score ? parseInt(score) : null,
-      feedback,
-      decision: decision || 'pending'
+      feedback: feedback || '',
+      decision: finalDecision
     }, { transaction: t });
 
-    // Mettre à jour l'application
-    let newApplicationStatus = 'interview_completed';
-    if (decision === 'pass') {
-      newApplicationStatus = 'accepted';
-    } else if (decision === 'fail') {
-      newApplicationStatus = 'rejected';
+    // Déterminer le nouveau statut de l'application basé sur la décision
+    let newApplicationStatus;
+    let emailSent = false;
+
+    switch (finalDecision) {
+      case 'pass':
+        newApplicationStatus = 'accepted';
+        console.log('✅ Candidate ACCEPTED');
+        break;
+      case 'fail':
+        newApplicationStatus = 'rejected';
+        console.log('❌ Candidate REJECTED');
+        break;
+      case 'pending':
+      default:
+        newApplicationStatus = 'interview_completed';
+        console.log('⏳ Decision PENDING');
+        break;
     }
 
+    // Mettre à jour l'application
     await interview.application.update({
       status: newApplicationStatus,
-      recruiter_notes: `${interview.application.recruiter_notes || ''}\n\nEntretien terminé le ${new Date().toLocaleString('fr-FR')}. Score: ${score || 'N/A'}, Décision: ${decision || 'En attente'}`
+      recruiter_notes: `${interview.application.recruiter_notes || ''}\n\n[ENTRETIEN TERMINÉ] ${new Date().toLocaleString('fr-FR')}\nScore: ${score || 'N/A'}/100\nDécision: ${getDecisionLabel(finalDecision)}\nFeedback: ${feedback || 'Aucun'}`
     }, { transaction: t });
 
-    // Envoyer email au candidat selon la décision
-    await sendInterviewCompletionEmail(interview, decision);
+    // Envoyer l'email approprié selon la décision
+    try {
+      await sendDecisionEmail(interview, finalDecision, feedback);
+      emailSent = true;
+      console.log(`✉️ Decision email sent for: ${finalDecision}`);
+    } catch (emailError) {
+      console.error('❌ Error sending decision email:', emailError);
+      // Ne pas faire échouer la transaction si l'email ne peut pas être envoyé
+    }
 
     await t.commit();
+    
     res.json({
-      message: 'Entretien marqué comme terminé',
-      interview
+      message: `Entretien terminé avec succès - Candidat ${getDecisionLabel(finalDecision)}`,
+      interview,
+      decision: finalDecision,
+      emailSent
     });
 
   } catch (error) {
     await t.rollback();
     console.error('Error completing interview:', error);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// Nouvelle fonction pour obtenir le label de décision
+const getDecisionLabel = (decision) => {
+  const labels = {
+    'pass': 'ACCEPTÉ',
+    'fail': 'REFUSÉ',
+    'pending': 'EN ATTENTE'
+  };
+  return labels[decision] || 'Non défini';
+};
+
+// Fonction améliorée pour envoyer l'email de décision
+const sendDecisionEmail = async (interview, decision, feedback) => {
+  try {
+    const candidate = interview.application.candidate;
+    const jobOffer = interview.application.jobOffer;
+    
+    if (!candidate || !jobOffer) {
+      console.error('❌ Candidate or JobOffer not found for decision email');
+      return;
+    }
+
+    let subject, htmlContent;
+
+    switch (decision) {
+      case 'pass':
+        // EMAIL D'ACCEPTATION
+        subject = `🎉 Félicitations ! Votre candidature a été retenue - ${jobOffer.title}`;
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: white; text-align: center; margin: 0;">🎊 FÉLICITATIONS ! 🎊</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h2 style="color: #10b981; margin-top: 0;">Excellente nouvelle, ${candidate.firstName} ${candidate.lastName} !</h2>
+                
+                <p style="font-size: 16px; line-height: 1.6; color: #374151;">
+                  Nous avons le grand plaisir de vous annoncer que votre candidature pour le poste de 
+                  <strong style="color: #6366f1;">${jobOffer.title}</strong> chez 
+                  <strong style="color: #6366f1;">${jobOffer.company}</strong> a été 
+                  <strong style="color: #10b981;">ACCEPTÉE</strong> !
+                </p>
+
+                <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                  <h3 style="color: #065f46; margin-top: 0;">✨ Pourquoi vous avez été choisi(e)</h3>
+                  <p style="color: #047857;">
+                    Votre profil, vos compétences et votre entretien nous ont convaincus que vous êtes 
+                    la personne idéale pour rejoindre notre équipe.
+                  </p>
+                  ${interview.score ? `
+                    <p style="color: #047857;">
+                      <strong>Score d'entretien :</strong> ${interview.score}/100 - Excellent !
+                    </p>
+                  ` : ''}
+                </div>
+
+                ${feedback ? `
+                  <div style="background-color: #eff6ff; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                    <h3 style="color: #1e3a8a; margin-top: 0;">💬 Commentaire du recruteur</h3>
+                    <p style="color: #1e40af; font-style: italic;">
+                      "${feedback}"
+                    </p>
+                  </div>
+                ` : ''}
+
+                <div style="background-color: #fef3c7; padding: 20px; margin: 20px 0; border-radius: 10px;">
+                  <h3 style="color: #92400e; margin-top: 0;">📋 Prochaines étapes</h3>
+                  <ul style="color: #78350f;">
+                    <li>Notre équipe RH vous contactera sous 48h</li>
+                    <li>Discussion des détails du contrat et de la rémunération</li>
+                    <li>Planification de votre date de début</li>
+                    <li>Préparation de votre intégration</li>
+                  </ul>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                  <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px 30px; border-radius: 50px;">
+                    <p style="color: white; margin: 0; font-size: 18px; font-weight: bold;">
+                      🎯 Bienvenue dans l'équipe !
+                    </p>
+                  </div>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px; text-align: center;">
+                  Nous avons hâte de travailler avec vous !<br>
+                  Cordialement,<br>
+                  <strong>L'équipe ${jobOffer.company}</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+        break;
+
+      case 'fail':
+        // EMAIL DE REFUS
+        subject = `Suite à votre candidature - ${jobOffer.title}`;
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #374151; text-align: center; margin: 0; font-size: 24px;">
+                Suite à votre candidature
+              </h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h2 style="color: #374151; margin-top: 0;">Bonjour ${candidate.firstName} ${candidate.lastName},</h2>
+                
+                <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">
+                  Nous vous remercions sincèrement pour le temps et l'intérêt que vous avez consacrés 
+                  à votre candidature pour le poste de <strong>${jobOffer.title}</strong> 
+                  au sein de <strong>${jobOffer.company}</strong>.
+                </p>
+
+                <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">
+                  Après une étude approfondie de votre profil et suite à votre entretien, 
+                  nous avons le regret de vous informer que nous ne pouvons donner une suite 
+                  favorable à votre candidature pour ce poste spécifique.
+                </p>
+
+                ${feedback ? `
+                  <div style="background-color: #f3f4f6; border-left: 4px solid #9ca3af; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                    <h3 style="color: #4b5563; margin-top: 0;">💭 Retour constructif</h3>
+                    <p style="color: #6b7280;">
+                      ${feedback}
+                    </p>
+                  </div>
+                ` : ''}
+
+                <div style="background-color: #eff6ff; padding: 20px; margin: 20px 0; border-radius: 10px;">
+                  <h3 style="color: #1e3a8a; margin-top: 0;">💡 Pour aller plus loin</h3>
+                  <p style="color: #3730a3;">
+                    Cette décision ne remet pas en cause vos qualités professionnelles. 
+                    D'autres opportunités au sein de notre entreprise pourraient mieux 
+                    correspondre à votre profil.
+                  </p>
+                  <p style="color: #3730a3;">
+                    Nous vous encourageons à consulter régulièrement nos offres d'emploi 
+                    et à postuler à nouveau si une opportunité vous intéresse.
+                  </p>
+                </div>
+
+                <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">
+                  Nous vous souhaitons pleine réussite dans vos projets professionnels 
+                  et espérons avoir l'occasion de collaborer avec vous dans le futur.
+                </p>
+
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                  <p style="color: #6b7280; font-size: 14px;">
+                    Très cordialement,<br>
+                    <strong>L'équipe de recrutement</strong><br>
+                    ${jobOffer.company}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        break;
+
+      case 'pending':
+      default:
+        // EMAIL D'ATTENTE
+        subject = `Entretien terminé - ${jobOffer.title}`;
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2196F3; text-align: center;">Entretien Terminé</h1>
+            
+            <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h2>Bonjour ${candidate.firstName} ${candidate.lastName},</h2>
+              <p>Votre entretien pour le poste de <strong>${jobOffer.title}</strong> s'est bien déroulé.</p>
+              <p>Nous sommes en train d'examiner toutes les candidatures et vous contacterons 
+                 prochainement pour vous informer de notre décision.</p>
+              ${feedback ? `
+                <div style="margin-top: 15px; padding: 15px; background-color: white; border-radius: 5px;">
+                  <p><strong>Retour sur votre entretien :</strong></p>
+                  <p style="color: #4b5563;">${feedback}</p>
+                </div>
+              ` : ''}
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="color: #2196F3;">Merci pour votre patience.</p>
+            </div>
+          </div>
+        `;
+    }
+
+    // Envoyer l'email
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: candidate.email,
+      subject,
+      html: htmlContent
+    });
+
+    console.log(`✅ Decision email (${decision}) sent to ${candidate.email}`);
+
+  } catch (error) {
+    console.error('❌ Error sending decision email:', error);
+    throw error;
   }
 };
 
@@ -1044,88 +1282,6 @@ const sendInterviewRescheduleEmail = async (interview, oldDate, reason) => {
   }
 };
 
-// Envoyer email de fin d'entretien
-const sendInterviewCompletionEmail = async (interview, decision) => {
-  try {
-    const candidate = interview.application.candidate;
-    const jobOffer = interview.application.jobOffer;
-
-    let subject, content;
-
-    switch (decision) {
-      case 'pass':
-        subject = `🎉 Félicitations ! Entretien réussi - ${jobOffer.title}`;
-        content = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #10b981; text-align: center;">Félicitations !</h1>
-            
-            <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
-              <h2>Bonjour ${candidate.firstName} ${candidate.lastName},</h2>
-              <p>Nous avons le plaisir de vous informer que votre entretien pour le poste de <strong>${jobOffer.title}</strong> s'est très bien déroulé !</p>
-              <p>Votre candidature a été <strong style="color: #10b981;">ACCEPTÉE</strong>.</p>
-            </div>
-
-            <div style="text-align: center; margin: 30px 0;">
-              <p style="color: #10b981; font-weight: bold; font-size: 18px;">🎯 Bienvenue dans l'équipe !</p>
-              <p style="color: #059669;">Nous vous contacterons prochainement pour finaliser les détails.</p>
-            </div>
-          </div>
-        `;
-        break;
-
-      case 'fail':
-        subject = `Entretien - ${jobOffer.title}`;
-        content = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #374151; text-align: center;">Entretien</h1>
-            
-            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h2>Bonjour ${candidate.firstName} ${candidate.lastName},</h2>
-              <p>Nous vous remercions pour le temps consacré à l'entretien pour le poste de <strong>${jobOffer.title}</strong>.</p>
-              <p>Après réflexion, nous avons décidé de ne pas donner suite à votre candidature pour ce poste spécifique.</p>
-              <p>Nous vous encourageons à consulter nos autres offres d'emploi qui pourraient mieux correspondre à votre profil.</p>
-            </div>
-
-            <div style="text-align: center; margin: 30px 0;">
-              <p style="color: #6b7280;">Nous vous souhaitons bonne chance dans vos recherches.</p>
-            </div>
-          </div>
-        `;
-        break;
-
-      default:
-        subject = `Entretien terminé - ${jobOffer.title}`;
-        content = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #2196F3; text-align: center;">Entretien Terminé</h1>
-            
-            <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h2>Bonjour ${candidate.firstName} ${candidate.lastName},</h2>
-              <p>Votre entretien pour le poste de <strong>${jobOffer.title}</strong> s'est bien déroulé.</p>
-              <p>Nous sommes en train d'examiner votre candidature et vous contacterons prochainement pour vous informer de notre décision.</p>
-            </div>
-
-            <div style="text-align: center; margin: 30px 0;">
-              <p style="color: #2196F3;">Merci pour votre temps et votre intérêt pour notre entreprise.</p>
-            </div>
-          </div>
-        `;
-    }
-
-    await transporter.sendMail({
-      from: process.env.FROM_EMAIL,
-      to: candidate.email,
-      subject,
-      html: content
-    });
-
-    console.log('✅ Interview completion email sent to candidate');
-
-  } catch (emailError) {
-    console.error('❌ Error sending interview completion email:', emailError);
-  }
-};
-
 // Obtenir le label du type d'entretien
 const getInterviewTypeLabel = (type) => {
   const labels = {
@@ -1262,19 +1418,11 @@ module.exports = {
   sendInterviewNotificationEmail,
   sendInterviewConfirmationEmail,
   sendInterviewCancellationEmail,
-  sendInterviewCompletionEmail,
-  generateGoogleMeetLink: generateGoogleMeetLinkExport,
+  sendDecisionEmail,
+  getDecisionLabel,
+  generateGoogleMeetLink: generateGoogleMeetLink,
   getInterviewTypeLabel,
   sendDetailedInterviewNotification,
   getInterviewModeInfo,
   downloadCVFromInterview
 };
-
-// Export de la fonction generateGoogleMeetLink pour utilisation externe
-function generateGoogleMeetLinkExport() {
-  const characters = 'abcdefghijklmnopqrstuvwxyz';
-  const part1 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
-  const part2 = Array.from({length: 4}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
-  const part3 = Array.from({length: 3}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
-  return `https://meet.google.com/${part1}-${part2}-${part3}`;
-}

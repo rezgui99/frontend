@@ -1,6 +1,9 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pydantic import ValidationError
 from typing import List, Optional, Dict, Any
 import uvicorn
 import logging
@@ -26,6 +29,38 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Gestionnaire d'erreur pour les erreurs de validation
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    """Gestionnaire personnalisé pour les erreurs de validation 422"""
+    logger.error("🔍 Validation Error Details:")
+    logger.error(f"📍 URL: {request.url}")
+    logger.error(f"📋 Method: {request.method}")
+    
+    # Log des erreurs de validation détaillées
+    validation_errors = []
+    for error in exc.errors():
+        error_detail = {
+            "field": " -> ".join(str(loc) for loc in error["loc"]),
+            "message": error["msg"],
+            "type": error["type"],
+            "input": str(error.get("input", ""))[:100]  # Limiter la taille
+        }
+        validation_errors.append(error_detail)
+        logger.error(f"  ❌ Field: {error_detail['field']}")
+        logger.error(f"     Message: {error_detail['message']}")
+        logger.error(f"     Type: {error_detail['type']}")
+        logger.error(f"     Input: {error_detail['input']}")
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "Validation Error",
+            "message": "Les données fournies ne correspondent pas au schéma attendu",
+            "details": validation_errors,
+            "timestamp": datetime.now().isoformat()
+        }
+    )
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
@@ -110,11 +145,19 @@ async def get_training_recommendations(request: TrainingRecommendationRequest):
     aux exigences d'un poste cible et recommande des formations pour combler les écarts.
     """
     try:
-        logger.info(f"🎯 Getting training recommendations for employee {request.employee.id}")
+        logger.info(f"🎯 Processing training recommendations request")
+        logger.info(f"📋 Employee ID: {request.employee.id}")
+        logger.info(f"🎯 Target job ID: {request.target_job.id}")
+        logger.info(f"⚙️ Max recommendations: {request.max_recommendations}")
+        logger.info(f"🎯 Priority threshold: {request.priority_threshold}")
         
         # Traitement des données
         processed_employee = data_processor.process_employee_data(request.employee)
         processed_job = data_processor.process_job_data(request.target_job)
+        
+        logger.info(f"✅ Data processing completed")
+        logger.info(f"📈 Employee skills count: {len(processed_employee.skills)}")
+        logger.info(f"📋 Target job required skills: {len(processed_job.required_skills)}")
         
         # Génération des recommandations
         recommendations = await recommendation_engine.generate_training_recommendations(
@@ -124,12 +167,33 @@ async def get_training_recommendations(request: TrainingRecommendationRequest):
             priority_threshold=request.priority_threshold
         )
         
-        logger.info(f"✅ Generated {len(recommendations)} training recommendations")
+        logger.info(f"✅ Generated {len(recommendations)} training recommendations successfully")
         return recommendations
         
     except Exception as e:
-        logger.error(f"❌ Error generating training recommendations: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération des recommandations de formation: {str(e)}")
+        logger.error(f"❌ Error in training recommendations endpoint:")
+        logger.error(f"   Error type: {type(e).__name__}")
+        logger.error(f"   Error message: {str(e)}")
+        
+        # Différencier les erreurs de validation des erreurs internes
+        if isinstance(e, (ValidationError, ValueError)):
+            raise HTTPException(
+                status_code=422, 
+                detail={
+                    "error": "Validation Error", 
+                    "message": f"Données invalides: {str(e)}",
+                    "type": type(e).__name__
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail={
+                    "error": "Internal Server Error",
+                    "message": "Erreur lors de la génération des recommandations de formation",
+                    "type": type(e).__name__
+                }
+            )
 
 @app.post("/api/v1/recommendations/jobs", response_model=List[JobRecommendation])
 async def get_job_recommendations(request: JobRecommendationRequest):
@@ -140,11 +204,19 @@ async def get_job_recommendations(request: JobRecommendationRequest):
     les postes les plus compatibles parmi ceux disponibles.
     """
     try:
-        logger.info(f"💼 Getting job recommendations for employee {request.employee.id}")
+        logger.info(f"💼 Processing job recommendations request")
+        logger.info(f"📋 Employee ID: {request.employee.id}")
+        logger.info(f"📊 Available jobs count: {len(request.available_jobs)}")
+        logger.info(f"⚙️ Max recommendations: {request.max_recommendations}")
+        logger.info(f"🎯 Min compatibility: {request.min_compatibility_score}")
         
         # Traitement des données
         processed_employee = data_processor.process_employee_data(request.employee)
         processed_jobs = [data_processor.process_job_data(job) for job in request.available_jobs]
+        
+        logger.info(f"✅ Data processing completed")
+        logger.info(f"📈 Employee skills count: {len(processed_employee.skills)}")
+        logger.info(f"📋 Processed jobs count: {len(processed_jobs)}")
         
         # Génération des recommandations
         recommendations = await recommendation_engine.generate_job_recommendations(
@@ -154,12 +226,33 @@ async def get_job_recommendations(request: JobRecommendationRequest):
             min_compatibility_score=request.min_compatibility_score
         )
         
-        logger.info(f"✅ Generated {len(recommendations)} job recommendations")
+        logger.info(f"✅ Generated {len(recommendations)} job recommendations successfully")
         return recommendations
         
     except Exception as e:
-        logger.error(f"❌ Error generating job recommendations: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération des recommandations de poste: {str(e)}")
+        logger.error(f"❌ Error in job recommendations endpoint:")
+        logger.error(f"   Error type: {type(e).__name__}")
+        logger.error(f"   Error message: {str(e)}")
+        
+        # Différencier les erreurs de validation des erreurs internes
+        if isinstance(e, (ValidationError, ValueError)):
+            raise HTTPException(
+                status_code=422, 
+                detail={
+                    "error": "Validation Error",
+                    "message": f"Données invalides: {str(e)}",
+                    "type": type(e).__name__
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail={
+                    "error": "Internal Server Error",
+                    "message": "Erreur lors de la génération des recommandations de poste",
+                    "type": type(e).__name__
+                }
+            )
 
 # Routes utilitaires
 @app.post("/api/v1/models/retrain")

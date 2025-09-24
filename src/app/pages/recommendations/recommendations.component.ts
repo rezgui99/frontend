@@ -130,7 +130,8 @@ getTrainingRecommendations(): void {
   this.successMessage = null;
   this.trainingRecommendations = [];
 
-  console.log('🎓 Getting training recommendations for:', {
+  console.log('🎓 Starting training recommendations request');
+  console.log('📋 Parameters:', {
     employeeId: this.selectedEmployeeId,
     targetJobId: this.selectedTargetJobId,
     maxRecommendations: this.maxTrainingRecommendations,
@@ -144,7 +145,9 @@ getTrainingRecommendations(): void {
     this.priorityThreshold
   ).subscribe({
     next: (response) => {
-      console.log('✅ Training recommendations response:', response);
+      console.log('✅ Training recommendations received successfully');
+      console.log('📊 Response type:', typeof response);
+      console.log('📈 Data keys:', Object.keys(response || {}));
 
       // 1) Toujours prendre un tableau
       const recs = Array.isArray(response?.recommendations) ? response.recommendations : [];
@@ -164,9 +167,20 @@ getTrainingRecommendations(): void {
       this.loadingTraining = false;
     },
     error: (error) => {
-      console.error('❌ Error getting training recommendations:', error);
-      this.errorMessage = `Erreur API ML: ${error?.error?.error || error?.message}. ` +
-                          `Le système a basculé automatiquement sur le calcul heuristique de fallback.`;
+      console.error('❌ Training recommendations error details:');
+      console.error('📋 Status:', error?.status || 'unknown');
+      console.error('💬 Message:', error?.message || 'unknown');
+      console.error('🔍 Error keys:', Object.keys(error?.error || {}));
+      
+      // Gestion spécifique de l'erreur 422
+      if (error?.status === 422) {
+        console.error('🔍 Validation error details:', error?.error?.details || []);
+        this.errorMessage = 'Erreur de validation des données. Vérifiez les logs pour plus de détails.';
+      } else {
+        this.errorMessage = `Erreur API ML (${error?.status || 'unknown'}): ${error?.error?.message || error?.message}. ` +
+                            `Le système a basculé automatiquement sur le calcul heuristique de fallback.`;
+      }
+      
       this.trainingRecommendations = [];
       this.loadingTraining = false;
     }

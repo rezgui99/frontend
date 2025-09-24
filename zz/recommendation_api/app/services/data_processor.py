@@ -19,12 +19,19 @@ class DataProcessor:
     def process_employee_data(self, employee: Employee) -> Employee:
         """Traiter et enrichir les données d'un employé"""
         
+        logger.info(f"📊 Processing employee data for ID: {employee.id}")
+        logger.info(f"📈 Input skills count: {len(employee.skills)}")
+        
         # Calculer les métriques dérivées
         processed_employee = employee.copy(deep=True)
         
         # Calculer l'expérience totale si pas fournie
         if not processed_employee.years_total_experience:
-            years_since_hire = (datetime.now() - employee.hire_date).days // 365
+            hire_datetime = self._parse_date_safe(employee.hire_date)
+            if hire_datetime:
+                years_since_hire = (datetime.now() - hire_datetime).days // 365
+            else:
+                years_since_hire = 2  # Valeur par défaut
             processed_employee.years_total_experience = max(0, years_since_hire)
         
         # Calculer les scores de performance si pas fournis
@@ -40,7 +47,43 @@ class DataProcessor:
         # Enrichir les compétences avec des métadonnées
         processed_employee.skills = self._enrich_employee_skills(employee.skills)
         
+        logger.info(f"✅ Employee data processed successfully")
         return processed_employee
+    
+    def _parse_date_safe(self, date_str: str) -> Optional[datetime]:
+        """Parser une date string de manière sécurisée"""
+        if not date_str:
+            return None
+        
+        try:
+            # Essayer différents formats courants
+            formats = [
+                '%Y-%m-%d',
+                '%Y-%m-%dT%H:%M:%S',
+                '%Y-%m-%dT%H:%M:%S.%f',
+                '%Y-%m-%dT%H:%M:%SZ',
+                '%Y-%m-%dT%H:%M:%S.%fZ'
+            ]
+            
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
+                    continue
+            
+            # Fallback avec dateutil si disponible
+            try:
+                from dateutil.parser import parse
+                return parse(date_str)
+            except ImportError:
+                pass
+            
+            logger.warning(f"⚠️ Could not parse date: {date_str}")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error parsing date {date_str}: {e}")
+            return None
     
     def process_job_data(self, job: JobDescription) -> JobDescription:
         """Traiter et enrichir les données d'un poste"""
@@ -144,7 +187,8 @@ class DataProcessor:
         # Analyser la progression des compétences
         skills_with_dates = [
             skill for skill in employee.skills 
-            if skill.acquired_date and skill.last_evaluated_date
+            if skill.acquired_date and skill.last_evaluated_date and 
+               self._parse_date_safe(skill.acquired_date) and self._parse_date_safe(skill.last_evaluated_date)
         ]
         
         if not skills_with_dates:
@@ -156,8 +200,11 @@ class DataProcessor:
         total_time = 0
         
         for skill in skills_with_dates:
-            if skill.last_evaluated_date > skill.acquired_date:
-                time_diff = (skill.last_evaluated_date - skill.acquired_date).days
+            acquired_date = self._parse_date_safe(skill.acquired_date)
+            evaluated_date = self._parse_date_safe(skill.last_evaluated_date)
+            
+            if acquired_date and evaluated_date and evaluated_date > acquired_date:
+                time_diff = (evaluated_date - acquired_date).days
                 if time_diff > 0:
                     progression_rate = skill.current_level / max(1, time_diff / 365)
                     total_progression += progression_rate
@@ -267,24 +314,48 @@ class DataProcessor:
         return enriched_skills
     
     def _validate_employee_data(self, employee_data: Dict) -> List[str]:
-        """Valider les données d'un employé"""
+        """Valider les données d'un employé avec logs détaillés"""
         errors = []
+        
+        logger.info(f"🔍 Validating employee data")
+        logger.info(f"📋 Employee data keys: {list(employee_data.keys())}")
         
         required_fields = ['id', 'name', 'position', 'hire_date', 'email']
         for field in required_fields:
             if field not in employee_data:
-                errors.append(f"Champ requis manquant: employee.{field}")
+                error_msg = f"Champ requis manquant: employee.{field}"
+                errors.append(error_msg)
+                logger.error(f"❌ {error_msg}")
         
-        # Validation des compétences
+        # Validation des compétences avec logs détaillés
         if 'skills' in employee_data:
-            for i, skill in enumerate(employee_data['skills']):
+            skills = employee_data['skills']
+            logger.info(f"📈 Validating {len(skills)} skills")
+            
+            for i, skill in enumerate(skills):
+                logger.debug(f"🔍 Skill {i}: {list(skill.keys())}")
+                
                 if 'skill_id' not in skill:
-                    errors.append(f"employee.skills[{i}].skill_id manquant")
+                    error_msg = f"employee.skills[{i}].skill_id manquant"
+                    errors.append(error_msg)
+                    logger.error(f"❌ {error_msg}")
+                    
                 if 'current_level' not in skill:
-                    errors.append(f"employee.skills[{i}].current_level manquant")
+                    error_msg = f"employee.skills[{i}].current_level manquant"
+                    errors.append(error_msg)
+                    logger.error(f"❌ {error_msg}")
                 elif not (1 <= skill['current_level'] <= 5):
-                    errors.append(f"employee.skills[{i}].current_level doit être entre 1 et 5")
+                    error_msg = f"employee.skills[{i}].current_level doit être entre 1 et 5 (reçu: {skill['current_level']})"
+                    errors.append(error_msg)
+                    logger.error(f"❌ {error_msg}")
+        else:
+            logger.warning("⚠️ No skills provided in employee data")
         
+        if errors:
+            logger.error(f"❌ Validation failed with {len(errors)} errors")
+        else:
+            logger.info("✅ Employee data validation passed")
+            
         return errors
     
     def _validate_job_data(self, job_data: Dict, prefix: str = "job") -> List[str]:
