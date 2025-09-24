@@ -36,6 +36,12 @@ export class LoginComponent implements OnInit {
     // Get return url from route parameters or default to '/home'
     this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/home';
     
+    // Afficher un message si l'email vient d'être vérifié
+    if (this.route.snapshot.queryParams['emailVerified'] === 'true') {
+      // Vous pourriez ajouter un message de succès ici
+      console.log('Email vérifié avec succès');
+    }
+    
     // Redirect if already logged in
     if (this.authService.isAuthenticated) {
       this.router.navigate([this.returnUrl]);
@@ -67,6 +73,12 @@ export class LoginComponent implements OnInit {
     this.authService.login(loginData).subscribe({
       next: (response) => {
         console.log('Login successful:', response);
+        
+        // Afficher un message si il y avait des activités suspectes
+        if (response.hadSuspiciousActivity === true) {
+          console.log('Connexion réussie après activité suspecte détectée');
+        }
+        
         this.router.navigate([this.returnUrl]);
       },
       error: (error: ApiError) => {

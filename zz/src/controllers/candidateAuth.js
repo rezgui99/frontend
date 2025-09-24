@@ -5,6 +5,8 @@ const nodemailer = require('nodemailer');
 const db = require("../../models/index");
 const { Candidate, sequelize } = db;
 const { generateToken } = require('../middleware/auth');
+const emailService = require('../services/emailService');
+const securityService = require('../services/securityService');
 
 // Configuration email
 const transporter = nodemailer.createTransport({
@@ -56,39 +58,36 @@ const registerCandidate = async (req, res) => {
       phone,
       location,
       isActive: true,
-      emailVerified: true
+      emailVerified: false // Changé à false pour forcer la vérification
     }, { transaction: t });
+
+    // Générer et envoyer le code de vérification
+    const verificationCode = candidate.generateVerificationCode();
+    await candidate.save({ transaction: t });
+
+    // Envoyer l'email avec le code
+    try {
+      await emailService.sendVerificationCode(
+        email,
+        firstName,
+        lastName,
+        verificationCode,
+        'candidate'
+      );
+      console.log('📧 Code de vérification candidat envoyé à:', email);
+    } catch (emailError) {
+      console.error('Erreur envoi code vérification candidat:', emailError);
+      // Ne pas bloquer l'inscription si l'email échoue
+    }
 
     const token = generateToken(candidate.id, 'candidate');
 
-    // Envoi email de bienvenue
-    try {
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL,
-        to: email,
-        subject: 'Bienvenue sur SmartHire - Espace Candidat',
-        html: `
-          <h1>Bienvenue ${firstName} ${lastName}!</h1>
-          <p>Votre compte candidat a été créé avec succès.</p>
-          <p>Vous pouvez maintenant :</p>
-          <ul>
-            <li>Consulter les offres d'emploi disponibles</li>
-            <li>Postuler aux offres qui vous intéressent</li>
-            <li>Gérer vos CVs et votre profil</li>
-            <li>Suivre l'état de vos candidatures</li>
-          </ul>
-          <p>Bonne recherche d'emploi !</p>
-        `
-      });
-    } catch (emailError) {
-      console.error('Erreur envoi email candidat:', emailError);
-    }
-
     await t.commit();
     res.status(201).json({ 
-      message: 'Compte candidat créé avec succès', 
+      message: 'Compte candidat créé avec succès. Vérifiez votre email pour confirmer votre inscription.', 
       candidate: candidate.toJSON(), 
-      token 
+      token,
+      emailVerificationRequired: true
     });
 
   } catch (error) {
@@ -128,22 +127,51 @@ const loginCandidate = async (req, res) => {
       return res.status(401).json({ error: 'Votre compte a été désactivé' });
     }
 
+    // Vérifier si le compte est verrouillé
+    if (securityService.isAccountLocked(candidate)) {
+      const remainingTime = securityService.getLockTimeRemaining(candidate);
+      return res.status(401).json({ 
+        error: `Compte temporairement verrouillé. Réessayez dans ${remainingTime} minute(s).`,
+        lockTimeRemaining: remainingTime
+      });
+    }
+
     const isPasswordValid = await candidate.checkPassword(password);
     if (!isPasswordValid) {
+      // Analyser la tentative échouée avec le service de sécurité
+      const result = await securityService.analyzeLoginAttempt(
+        candidate, 
+        req.ip || req.connection.remoteAddress, 
+        req.get('User-Agent'), 
+        false
+      );
+      
+      if (result.locked) {
+        return res.status(401).json({ 
+          error: `Trop de tentatives échouées. Compte verrouillé pour ${securityService.lockoutDuration} minutes.`,
+          accountLocked: true,
+          attempts: result.attempts
+        });
+      }
+      
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
-    // Mettre à jour la dernière connexion
-    await candidate.update({ 
-      lastLogin: new Date()
-    });
+    // Analyser la connexion réussie
+    const loginResult = await securityService.analyzeLoginAttempt(
+      candidate, 
+      req.ip || req.connection.remoteAddress, 
+      req.get('User-Agent'), 
+      true
+    );
     
     const token = generateToken(candidate.id, 'candidate');
 
     res.json({ 
       message: 'Connexion réussie', 
       candidate: candidate.toJSON(), 
-      token 
+      token,
+      hadSuspiciousActivity: loginResult.hadSuspiciousActivity
     });
   } catch (error) {
     console.error('Erreur login candidat:', error);
@@ -353,9 +381,128 @@ const resetPasswordCandidate = async (req, res) => {
   }
 };
 
+// Vérifier le code de confirmation email pour candidat
+const verifyCandidateEmail = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email et code de vérification requis' });
+    }
+
+    if (!securityService.isValidVerificationCode(code)) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Format de code invalide' });
+    }
+
+    const candidate = await Candidate.findOne({ where: { email }, transaction: t });
+    if (!candidate) {
+      await t.rollback();
+      return res.status(404).json({ error: 'Candidat non trouvé' });
+    }
+
+    if (candidate.emailVerified) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email déjà vérifié' });
+    }
+
+    if (!candidate.verifyEmailCode(code)) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Code de vérification invalide ou expiré' });
+    }
+
+    // Marquer l'email comme vérifié
+    await candidate.update({
+      emailVerified: true,
+      emailVerificationCode: null,
+      emailVerificationExpires: null
+    }, { transaction: t });
+
+    // Envoyer email de confirmation
+    try {
+      await emailService.sendEmailVerifiedConfirmation(
+        candidate.email,
+        candidate.firstName,
+        candidate.lastName,
+        'candidate'
+      );
+    } catch (emailError) {
+      console.error('Erreur envoi confirmation email candidat:', emailError);
+    }
+
+    await t.commit();
+    res.json({ 
+      message: 'Email vérifié avec succès ! Vous pouvez maintenant vous connecter.',
+      emailVerified: true
+    });
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Erreur vérification email candidat:', error);
+    res.status(500).json({ error: 'Erreur lors de la vérification de l\'email' });
+  }
+};
+
+// Renvoyer le code de vérification pour candidat
+const resendCandidateVerificationCode = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email requis' });
+    }
+
+    const candidate = await Candidate.findOne({ where: { email }, transaction: t });
+    if (!candidate) {
+      await t.rollback();
+      return res.status(404).json({ error: 'Candidat non trouvé' });
+    }
+
+    if (candidate.emailVerified) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email déjà vérifié' });
+    }
+
+    // Générer un nouveau code
+    const verificationCode = candidate.generateVerificationCode();
+    await candidate.save({ transaction: t });
+
+    // Envoyer le nouveau code
+    try {
+      await emailService.sendVerificationCode(
+        email,
+        candidate.firstName,
+        candidate.lastName,
+        verificationCode,
+        'candidate'
+      );
+    } catch (emailError) {
+      console.error('Erreur renvoi code candidat:', emailError);
+      await t.rollback();
+      return res.status(500).json({ error: 'Erreur lors de l\'envoi du code' });
+    }
+
+    await t.commit();
+    res.json({ message: 'Nouveau code de vérification envoyé' });
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Erreur renvoi code vérification candidat:', error);
+    res.status(500).json({ error: 'Erreur lors du renvoi du code' });
+  }
+};
+
 module.exports = {
   registerCandidate,
   loginCandidate,
+  verifyCandidateEmail,
+  resendCandidateVerificationCode,
   getCandidateProfile,
   updateCandidateProfile,
   forgotPasswordCandidate,

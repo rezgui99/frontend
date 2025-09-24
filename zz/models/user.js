@@ -50,6 +50,42 @@ module.exports = (sequelize, DataTypes) => {
       return roles.filter(role => role.is_active);
     }
 
+    // Generate email verification code
+    generateVerificationCode() {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      this.emailVerificationCode = code;
+      this.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      return code;
+    }
+
+    // Verify email verification code
+    verifyEmailCode(code) {
+      if (!this.emailVerificationCode || !this.emailVerificationExpires) {
+        return false;
+      }
+      
+      if (new Date() > this.emailVerificationExpires) {
+        return false;
+      }
+      
+      return this.emailVerificationCode === code;
+    }
+
+    // Track suspicious activity
+    async trackSuspiciousActivity() {
+      this.suspiciousActivityCount = (this.suspiciousActivityCount || 0) + 1;
+      this.lastSuspiciousActivity = new Date();
+      
+      // Reset security notification flag if it's been more than 24 hours
+      if (this.lastSuspiciousActivity && 
+          new Date() - new Date(this.lastSuspiciousActivity) > 24 * 60 * 60 * 1000) {
+        this.securityNotificationSent = false;
+      }
+      
+      await this.save();
+      return this.suspiciousActivityCount;
+    }
+
     // Instance method to get user without password
     toJSON() {
       const values = Object.assign({}, this.get());
@@ -57,6 +93,7 @@ module.exports = (sequelize, DataTypes) => {
       delete values.resetPasswordToken;
       delete values.resetPasswordExpires;
       delete values.emailVerificationToken;
+      delete values.emailVerificationCode;
       return values;
     }
   }
@@ -132,6 +169,26 @@ module.exports = (sequelize, DataTypes) => {
       },
       locked_until: {
         type: DataTypes.DATE
+      },
+      emailVerificationCode: {
+        type: DataTypes.STRING(6),
+        allowNull: true
+      },
+      emailVerificationExpires: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      suspiciousActivityCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+      },
+      lastSuspiciousActivity: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      securityNotificationSent: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
       }
     },
     {

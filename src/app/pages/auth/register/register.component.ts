@@ -94,7 +94,15 @@ export class RegisterComponent implements OnInit {
         console.log('Registration successful:', response);
         console.log('Utilisateur créé avec le rôle:', response.user.role);
         console.log('Rôles disponibles:', response.user.roles);
-        this.router.navigate(['/home']);
+        
+        // Rediriger vers la vérification email si nécessaire
+        if (response.emailVerificationRequired === true) {
+          this.router.navigate(['/auth/verify-email'], {
+            queryParams: { email: this.registerForm.value.email }
+          });
+        } else {
+          this.router.navigate(['/home']);
+        }
       },
       error: (error: ApiError) => {
         console.error('Registration error:', error);

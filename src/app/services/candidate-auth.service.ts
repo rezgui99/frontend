@@ -136,4 +136,14 @@ export class CandidateAuthService {
     return this.http.post(`${this.apiUrl}/reset-password`, data)
       .pipe(catchError(err => this.handleError(err)));
   }
+
+  verifyEmail(data: { email: string; code: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/verify-email`, data)
+      .pipe(catchError(err => this.handleError(err)));
+  }
+
+  resendVerificationCode(data: { email: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/resend-verification`, data)
+      .pipe(catchError(err => this.handleError(err)));
+  }
 }

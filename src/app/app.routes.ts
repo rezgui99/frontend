@@ -35,6 +35,11 @@ export const routes: Routes = [
   // Auth routes (accessible only to guests)
   { path: 'auth/login', component: LoginComponent, canActivate: [GuestGuard] },
   { path: 'auth/register', component: RegisterComponent, canActivate: [GuestGuard] },
+  { 
+    path: 'auth/verify-email', 
+    loadComponent: () => import('./pages/auth/email-verification/email-verification.component').then(m => m.EmailVerificationComponent),
+    canActivate: [GuestGuard] 
+  },
   { path: 'auth/forgot-password', component: ForgotPasswordComponent, canActivate: [GuestGuard] },
   { path: 'auth/reset-password', component: ResetPasswordComponent, canActivate: [GuestGuard] },
   
@@ -68,6 +73,11 @@ export const routes: Routes = [
   { 
     path: 'candidate/register', 
     loadComponent: () => import('./pages/candidate/register/candidate-register.component').then(m => m.CandidateRegisterComponent),
+    canActivate: [CandidateGuestGuard] 
+  },
+  { 
+    path: 'candidate/verify-email', 
+    loadComponent: () => import('./pages/candidate/email-verification/candidate-email-verification.component').then(m => m.CandidateEmailVerificationComponent),
     canActivate: [CandidateGuestGuard] 
   },
   { 

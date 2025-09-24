@@ -4,6 +4,8 @@ const { authenticateToken } = require('../middleware/auth');
 const {
   register,
   login,
+  verifyEmail,
+  resendVerificationCode,
   getProfile,
   updateProfile,
   forgotPassword,
@@ -14,6 +16,8 @@ const {
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerificationCode);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 

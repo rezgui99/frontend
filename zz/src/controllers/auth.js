@@ -5,6 +5,8 @@ const nodemailer = require('nodemailer');
 const db = require("../../models/index");
 const { User, sequelize } = db;
 const { generateToken } = require('../middleware/auth');
+const emailService = require('../services/emailService');
+const securityService = require('../services/securityService');
 
 // --- Nodemailer transporter ---
 const transporter = nodemailer.createTransport({
@@ -67,9 +69,28 @@ const register = async (req, res) => {
       email,
       password,
       isActive: true,
-      emailVerified: true,
+      emailVerified: false, // Changé à false pour forcer la vérification
       emailVerificationToken: crypto.randomBytes(32).toString('hex')
     }, { transaction: t });
+
+    // Générer et envoyer le code de vérification
+    const verificationCode = user.generateVerificationCode();
+    await user.save({ transaction: t });
+
+    // Envoyer l'email avec le code
+    try {
+      await emailService.sendVerificationCode(
+        email,
+        firstName,
+        lastName,
+        verificationCode,
+        'user'
+      );
+      console.log('📧 Code de vérification envoyé à:', email);
+    } catch (emailError) {
+      console.error('Erreur envoi code vérification:', emailError);
+      // Ne pas bloquer l'inscription si l'email échoue
+    }
 
     // Assigner le rôle HR par défaut aux nouveaux utilisateurs
     const hrRole = await db.Role.findOne({ where: { name: 'hr' }, transaction: t });
@@ -82,25 +103,6 @@ const register = async (req, res) => {
     }
 
     const token = generateToken(user.id);
-
-    // Envoi email de bienvenue
-    try {
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL,
-        to: email,
-        subject: 'Bienvenue sur SmartHire',
-        html: `
-          <h1>Bienvenue ${firstName} ${lastName}!</h1>
-          <p>Votre compte a été créé avec succès.</p>
-          <p>Votre nom d'utilisateur : <strong>${username}</strong></p>
-          <p>Votre rôle : <strong>HR</strong></p>
-          <p>Vous pouvez maintenant vous connecter à votre espace.</p>
-        `
-      });
-    } catch (emailError) {
-      console.error('Erreur envoi email:', emailError);
-      // Ne pas bloquer l'inscription si l'email échoue
-    }
 
     // Récupérer l'utilisateur avec ses rôles pour la réponse
     const userWithRoles = await User.findByPk(user.id, {
@@ -122,7 +124,12 @@ const register = async (req, res) => {
     };
 
     await t.commit();
-    res.status(201).json({ message: 'Utilisateur créé avec succès', user: userResponse, token });
+    res.status(201).json({ 
+      message: 'Utilisateur créé avec succès. Vérifiez votre email pour confirmer votre inscription.', 
+      user: userResponse, 
+      token,
+      emailVerificationRequired: true
+    });
 
   } catch (error) {
     await t.rollback();
@@ -159,32 +166,42 @@ const login = async (req, res) => {
     if (!user.isActive) return res.status(401).json({ error: 'Votre compte a été désactivé' });
 
     // Vérifier si le compte est verrouillé
-    if (user.locked_until && new Date() < new Date(user.locked_until)) {
-      return res.status(401).json({ error: 'Compte temporairement verrouillé. Réessayez plus tard.' });
+    if (securityService.isAccountLocked(user)) {
+      const remainingTime = securityService.getLockTimeRemaining(user);
+      return res.status(401).json({ 
+        error: `Compte temporairement verrouillé. Réessayez dans ${remainingTime} minute(s).`,
+        lockTimeRemaining: remainingTime
+      });
     }
 
     const isPasswordValid = await user.checkPassword(password);
     if (!isPasswordValid) {
-      // Incrémenter les tentatives de connexion échouées
-      const attempts = (user.login_attempts || 0) + 1;
-      const updateData = { login_attempts: attempts };
+      // Analyser la tentative échouée avec le service de sécurité
+      const result = await securityService.analyzeLoginAttempt(
+        user, 
+        req.ip || req.connection.remoteAddress, 
+        req.get('User-Agent'), 
+        false
+      );
       
-      // Verrouiller le compte après 5 tentatives
-      if (attempts >= 5) {
-        updateData.locked_until = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      if (result.locked) {
+        return res.status(401).json({ 
+          error: `Trop de tentatives échouées. Compte verrouillé pour ${securityService.lockoutDuration} minutes.`,
+          accountLocked: true,
+          attempts: result.attempts
+        });
       }
       
-      await user.update(updateData);
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
-    // Réinitialiser les tentatives de connexion et mettre à jour la dernière connexion
-    await user.update({ 
-      lastLogin: new Date(),
-      login_attempts: 0,
-      locked_until: null,
-      last_login_ip: req.ip || req.connection.remoteAddress
-    });
+    // Analyser la connexion réussie
+    const loginResult = await securityService.analyzeLoginAttempt(
+      user, 
+      req.ip || req.connection.remoteAddress, 
+      req.get('User-Agent'), 
+      true
+    );
     
     // Récupérer les rôles de l'utilisateur
     const userWithRoles = await User.findByPk(user.id, {
@@ -220,10 +237,132 @@ const login = async (req, res) => {
       roles: userResponse.roles
     });
 
-    res.json({ message: 'Connexion réussie', user: userResponse, token });
+    res.json({ 
+      message: 'Connexion réussie', 
+      user: userResponse, 
+      token,
+      hadSuspiciousActivity: loginResult.hadSuspiciousActivity
+    });
   } catch (error) {
     console.error('Erreur login:', error);
     res.status(500).json({ error: 'Erreur lors de la connexion' });
+  }
+};
+
+// Vérifier le code de confirmation email
+const verifyEmail = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email et code de vérification requis' });
+    }
+
+    if (!securityService.isValidVerificationCode(code)) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Format de code invalide' });
+    }
+
+    const user = await User.findOne({ where: { email }, transaction: t });
+    if (!user) {
+      await t.rollback();
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    if (user.emailVerified) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email déjà vérifié' });
+    }
+
+    if (!user.verifyEmailCode(code)) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Code de vérification invalide ou expiré' });
+    }
+
+    // Marquer l'email comme vérifié
+    await user.update({
+      emailVerified: true,
+      emailVerificationCode: null,
+      emailVerificationExpires: null
+    }, { transaction: t });
+
+    // Envoyer email de confirmation
+    try {
+      await emailService.sendEmailVerifiedConfirmation(
+        user.email,
+        user.firstName,
+        user.lastName,
+        'user'
+      );
+    } catch (emailError) {
+      console.error('Erreur envoi confirmation email:', emailError);
+    }
+
+    await t.commit();
+    res.json({ 
+      message: 'Email vérifié avec succès ! Vous pouvez maintenant vous connecter.',
+      emailVerified: true
+    });
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Erreur vérification email:', error);
+    res.status(500).json({ error: 'Erreur lors de la vérification de l\'email' });
+  }
+};
+
+// Renvoyer le code de vérification
+const resendVerificationCode = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email requis' });
+    }
+
+    const user = await User.findOne({ where: { email }, transaction: t });
+    if (!user) {
+      await t.rollback();
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    if (user.emailVerified) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Email déjà vérifié' });
+    }
+
+    // Générer un nouveau code
+    const verificationCode = user.generateVerificationCode();
+    await user.save({ transaction: t });
+
+    // Envoyer le nouveau code
+    try {
+      await emailService.sendVerificationCode(
+        email,
+        user.firstName,
+        user.lastName,
+        verificationCode,
+        'user'
+      );
+    } catch (emailError) {
+      console.error('Erreur renvoi code:', emailError);
+      await t.rollback();
+      return res.status(500).json({ error: 'Erreur lors de l\'envoi du code' });
+    }
+
+    await t.commit();
+    res.json({ message: 'Nouveau code de vérification envoyé' });
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Erreur renvoi code vérification:', error);
+    res.status(500).json({ error: 'Erreur lors du renvoi du code' });
   }
 };
 
@@ -392,6 +531,8 @@ const logout = async (req, res) => {
 module.exports = {
   register,
   login,
+  verifyEmail,
+  resendVerificationCode,
   getProfile,
   updateProfile,
   forgotPassword,

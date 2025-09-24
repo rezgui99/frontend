@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { CandidateAuthService } from '../../../services/candidate-auth.service';
 
 @Component({
@@ -179,7 +179,8 @@ export class CandidateLoginComponent implements OnInit {
   constructor(
     private formBuilder: FormBuilder,
     private candidateAuthService: CandidateAuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.loginForm = this.formBuilder.group({
       email: ['', [Validators.required, Validators.email]],
@@ -189,6 +190,11 @@ export class CandidateLoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Afficher un message si l'email vient d'être vérifié
+    if (this.route.snapshot.queryParams['emailVerified'] === 'true') {
+      console.log('Email candidat vérifié avec succès');
+    }
+    
     // Redirect if already logged in
     if (this.candidateAuthService.isAuthenticated) {
       this.router.navigate(['/candidate/dashboard']);
@@ -216,6 +222,12 @@ export class CandidateLoginComponent implements OnInit {
     this.candidateAuthService.login(loginData).subscribe({
       next: (response) => {
         console.log('Candidate login successful:', response);
+        
+        // Afficher un message si il y avait des activités suspectes
+        if (response.hadSuspiciousActivity === true) {
+          console.log('Connexion candidat réussie après activité suspecte détectée');
+        }
+        
         this.router.navigate(['/candidate/dashboard']);
       },
       error: (error: any) => {

@@ -29,6 +29,8 @@ export interface AuthResponse {
   message: string;
   user: User;
   token: string;
+  hadSuspiciousActivity?: boolean;
+  emailVerificationRequired?: boolean;
 }
 
 export interface ForgotPasswordRequest {

@@ -90,7 +90,15 @@ export class CandidateRegisterComponent implements OnInit {
     this.candidateAuthService.register(registerData).subscribe({
       next: (response) => {
         console.log('Candidate registration successful:', response);
-        this.router.navigate(['/candidate/dashboard']);
+        
+        // Rediriger vers la vérification email si nécessaire
+        if (response.emailVerificationRequired === true) {
+          this.router.navigate(['/candidate/verify-email'], {
+            queryParams: { email: this.registerForm.value.email }
+          });
+        } else {
+          this.router.navigate(['/candidate/dashboard']);
+        }
       },
       error: (error: any) => {
         console.error('Candidate registration error:', error);

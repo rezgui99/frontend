@@ -133,6 +133,16 @@ export class AuthService {
       .pipe(catchError(err => this.handleError(err)));
   }
 
+  verifyEmail(data: { email: string; code: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/verify-email`, data)
+      .pipe(catchError(err => this.handleError(err)));
+  }
+
+  resendVerificationCode(data: { email: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/resend-verification`, data)
+      .pipe(catchError(err => this.handleError(err)));
+  }
+
   getProfile(): Observable<{ user: User }> {
     return this.http.get<{ user: User }>(`${this.apiUrl}/profile`)
       .pipe(

@@ -4,6 +4,8 @@ const { authenticateCandidateToken } = require('../middleware/candidateAuth');
 const {
   registerCandidate,
   loginCandidate,
+  verifyCandidateEmail,
+  resendCandidateVerificationCode,
   getCandidateProfile,
   updateCandidateProfile,
   forgotPasswordCandidate,
@@ -13,6 +15,8 @@ const {
 // Public routes
 router.post('/register', registerCandidate);
 router.post('/login', loginCandidate);
+router.post('/verify-email', verifyCandidateEmail);
+router.post('/resend-verification', resendCandidateVerificationCode);
 router.post('/forgot-password', forgotPasswordCandidate);
 router.post('/reset-password', resetPasswordCandidate);
 

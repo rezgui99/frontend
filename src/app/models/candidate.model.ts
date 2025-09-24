@@ -34,6 +34,8 @@ export interface CandidateAuthResponse {
   message: string;
   candidate: Candidate;
   token: string;
+  hadSuspiciousActivity?: boolean;
+  emailVerificationRequired?: boolean;
 }
 
 // === INTERFACES CVS ===
