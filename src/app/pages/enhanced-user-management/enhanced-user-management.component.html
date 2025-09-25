@@ -453,7 +453,7 @@
                         [appTooltip]="user.isActive ? 'Désactiver le compte utilisateur' : 'Réactiver le compte utilisateur'">
                   {{ user.isActive ? '🔒 Désactiver' : '🔓 Activer' }}
                 </button>
-                <button (click)="deleteUser(user, false)" 
+                <button (click)="deleteUser(user, true)" 
                         class="text-red-600 hover:text-red-900 transition-colors duration-150 text-xs px-2 py-1 rounded"
                         [disabled]="user.id === currentUserId"
                         appTooltip="Supprimer définitivement cet utilisateur (irréversible)">

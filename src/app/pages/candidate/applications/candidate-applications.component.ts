@@ -79,25 +79,8 @@ export class CandidateApplicationsComponent implements OnInit {
     return labels[status] || status;
   }
 
-  canWithdrawApplication(application: Application): boolean {
-    return ['applied', 'under_review'].includes(application.status);
-  }
 
-  withdrawApplication(application: Application): void {
-    if (!application.id) return;
-    
-    if (window.confirm('Êtes-vous sûr de vouloir retirer cette candidature ?')) {
-      this.candidateService.withdrawApplication(application.id).subscribe({
-        next: () => {
-          this.loadApplications(); // Refresh la liste
-        },
-        error: (error) => {
-          console.error('Error withdrawing application:', error);
-          this.errorMessage = error.message || 'Erreur lors du retrait de la candidature';
-        }
-      });
-    }
-  }
+
 
   formatDate(dateString?: string): string {
     if (!dateString) return '';
