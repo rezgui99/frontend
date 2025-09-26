@@ -46,7 +46,7 @@ class EmailService {
             ${code}
           </div>
           <p style="margin: 15px 0 0 0; font-size: 14px; opacity: 0.9;">
-            Ce code expire dans 15 minutes
+            Ce code expire dans 10 minutes
           </p>
         </div>
 
@@ -56,7 +56,7 @@ class EmailService {
             <li>Ne partagez jamais ce code avec personne</li>
             <li>Notre équipe ne vous demandera jamais ce code par téléphone</li>
             <li>Si vous n'avez pas demandé cette vérification, ignorez cet email</li>
-            <li>Le code expire automatiquement après 15 minutes</li>
+            <li>Le code expire automatiquement après 10 minutes</li>
           </ul>
         </div>
 

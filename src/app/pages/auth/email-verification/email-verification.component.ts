@@ -146,7 +146,7 @@ export class EmailVerificationComponent implements OnInit {
   errorMessage: string | null = null;
   successMessage: string | null = null;
   email: string = '';
-  timeRemaining = 900; // 15 minutes en secondes
+  timeRemaining = 600; // 10 minutes en secondes
   private timer: any;
 
   constructor(
@@ -221,7 +221,12 @@ export class EmailVerificationComponent implements OnInit {
         }, 3000);
       },
       error: (error: any) => {
-        this.errorMessage = error.message || 'Erreur lors de la vérification';
+        this.errorMessage = error.error?.message || error.message || 'Erreur lors de la vérification';
+        
+        // Si le code a expiré, proposer de renvoyer un nouveau code
+        if (this.errorMessage?.includes('expiré')) {
+          this.timeRemaining = 0;
+        }
         this.loading = false;
       },
       complete: () => {
@@ -237,7 +242,7 @@ export class EmailVerificationComponent implements OnInit {
     this.authService.resendVerificationCode({ email: this.email }).subscribe({
       next: (response) => {
         this.successMessage = 'Nouveau code envoyé ! Vérifiez votre email.';
-        this.timeRemaining = 900; // Reset timer
+        this.timeRemaining = 600; // Reset timer à 10 minutes
         this.startTimer();
         this.verificationForm.reset();
         
@@ -247,7 +252,7 @@ export class EmailVerificationComponent implements OnInit {
         }, 5000);
       },
       error: (error: any) => {
-        this.errorMessage = error.message || 'Erreur lors du renvoi du code';
+        this.errorMessage = error.error?.message || error.message || 'Erreur lors du renvoi du code';
       },
       complete: () => {
         this.resending = false;

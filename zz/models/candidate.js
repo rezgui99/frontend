@@ -38,17 +38,28 @@ module.exports = (sequelize, DataTypes) => {
     // Generate email verification code
     generateVerificationCode() {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      this.emailVerificationToken = code;
+      this.emailVerificationCode = code;
+      this.emailVerificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       return code;
     }
 
     // Verify email verification code
     verifyEmailCode(code) {
-      if (!this.emailVerificationToken) {
+      if (!this.emailVerificationCode) {
         return false;
       }
       
-      return this.emailVerificationToken === code;
+      if (new Date() > new Date(this.emailVerificationExpires)) {
+        return false; // Code expiré
+      }
+      
+      return this.emailVerificationCode === code;
+    }
+
+    // Check if verification code is expired
+    isVerificationCodeExpired() {
+      if (!this.emailVerificationExpires) return true;
+      return new Date() > new Date(this.emailVerificationExpires);
     }
 
     // Track suspicious activity
@@ -143,6 +154,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true
       },
       resetPasswordExpires: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      emailVerificationCode: {
+        type: DataTypes.STRING(6),
+        allowNull: true
+      },
+      emailVerificationExpires: {
         type: DataTypes.DATE,
         allowNull: true
       },

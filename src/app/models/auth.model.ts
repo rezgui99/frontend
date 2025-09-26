@@ -6,6 +6,7 @@ export interface User {
   role: 'admin' | 'hr';
   roles: string[];
   isActive: boolean;
+  isVerified: boolean;
   lastLogin?: string;
   emailVerified: boolean;
   createdAt: string;
@@ -26,11 +27,12 @@ export interface RegisterRequest {
 }
 
 export interface AuthResponse {
+  emailVerificationRequired: boolean;
   message: string;
   user: User;
   token: string;
   hadSuspiciousActivity?: boolean;
-  emailVerificationRequired?: boolean;
+  isVerified?: boolean;
 }
 
 export interface ForgotPasswordRequest {

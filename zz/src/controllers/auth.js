@@ -61,6 +61,10 @@ const register = async (req, res) => {
     // Générer un username unique basé sur l'email
     const username = email.split('@')[0] + Math.floor(Math.random() * 1000);
 
+    // Générer le code de vérification OTP
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
     // Création utilisateur
     const user = await User.create({
       username,
@@ -69,13 +73,10 @@ const register = async (req, res) => {
       email,
       password,
       isActive: true,
-      emailVerified: false, // Changé à false pour forcer la vérification
-      emailVerificationToken: crypto.randomBytes(32).toString('hex')
+      emailVerified: false,
+      emailVerificationCode: verificationCode,
+      emailVerificationExpires: verificationExpires
     }, { transaction: t });
-
-    // Générer et envoyer le code de vérification
-    const verificationCode = user.generateVerificationCode();
-    await user.save({ transaction: t });
 
     // Envoyer l'email avec le code
     try {
@@ -261,7 +262,7 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ error: 'Email et code de vérification requis' });
     }
 
-    if (!securityService.isValidVerificationCode(code)) {
+    if (!/^\d{6}$/.test(code)) {
       await t.rollback();
       return res.status(400).json({ error: 'Format de code invalide' });
     }
@@ -277,9 +278,15 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ error: 'Email déjà vérifié' });
     }
 
-    if (!user.verifyEmailCode(code)) {
+    // Vérifier le code et l'expiration
+    if (user.emailVerificationCode !== code) {
       await t.rollback();
       return res.status(400).json({ error: 'Code de vérification invalide ou expiré' });
+    }
+
+    if (new Date() > new Date(user.emailVerificationExpires)) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Code de vérification expiré' });
     }
 
     // Marquer l'email comme vérifié
@@ -287,6 +294,11 @@ const verifyEmail = async (req, res) => {
       emailVerified: true,
       emailVerificationCode: null,
       emailVerificationExpires: null
+    }, { transaction: t });
+
+    // Mettre à jour lastLogin pour permettre l'accès immédiat
+    await user.update({
+      lastLogin: new Date()
     }, { transaction: t });
 
     // Envoyer email de confirmation
@@ -337,9 +349,14 @@ const resendVerificationCode = async (req, res) => {
       return res.status(400).json({ error: 'Email déjà vérifié' });
     }
 
-    // Générer un nouveau code
-    const verificationCode = user.generateVerificationCode();
-    await user.save({ transaction: t });
+    // Générer un nouveau code OTP
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await user.update({
+      emailVerificationCode: verificationCode,
+      emailVerificationExpires: verificationExpires
+    }, { transaction: t });
 
     // Envoyer le nouveau code
     try {

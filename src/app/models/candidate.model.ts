@@ -9,6 +9,7 @@ export interface Candidate {
   bio?: string;
   profile_picture?: string;
   isActive: boolean;
+  isVerified: boolean;
   emailVerified: boolean;
   lastLogin?: string;
   createdAt?: string;
@@ -31,11 +32,12 @@ export interface CandidateLoginRequest {
 }
 
 export interface CandidateAuthResponse {
+  emailVerificationRequired: boolean;
   message: string;
   candidate: Candidate;
   token: string;
   hadSuspiciousActivity?: boolean;
-  emailVerificationRequired?: boolean;
+  isVerified?: boolean;
 }
 
 // === INTERFACES CVS ===
