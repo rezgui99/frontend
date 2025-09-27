@@ -32,16 +32,15 @@ export const routes: Routes = [
   // Page d'accueil publique (informations sur la plateforme)
   { path: 'welcome', component: WelcomeComponent },
   
-  // Auth routes (accessible only to guests)
-  { path: 'auth/login', component: LoginComponent, canActivate: [GuestGuard] },
-  { path: 'auth/register', component: RegisterComponent, canActivate: [GuestGuard] },
+  // Auth routes (TEMPORAIREMENT SANS GUARDS pour éviter les conflits)
+  { path: 'auth/login', component: LoginComponent },
+  { path: 'auth/register', component: RegisterComponent },
   { 
     path: 'auth/verify-email', 
-    loadComponent: () => import('./pages/auth/email-verification/email-verification.component').then(m => m.EmailVerificationComponent),
-    canActivate: [GuestGuard] 
+    loadComponent: () => import('./pages/auth/email-verification/email-verification.component').then(m => m.EmailVerificationComponent)
   },
-  { path: 'auth/forgot-password', component: ForgotPasswordComponent, canActivate: [GuestGuard] },
-  { path: 'auth/reset-password', component: ResetPasswordComponent, canActivate: [GuestGuard] },
+  { path: 'auth/forgot-password', component: ForgotPasswordComponent },
+  { path: 'auth/reset-password', component: ResetPasswordComponent },
   
   // Protected routes (require authentication)
   { path: 'home', component: HomeComponent, canActivate: [AuthGuard] },
@@ -59,7 +58,7 @@ export const routes: Routes = [
   { path: 'admin/users-enhanced', component: EnhancedUserManagementComponent, canActivate: [AuthGuard], data: { roles: ['admin'] } },
   
   
-  // Routes candidats
+  // Routes candidats (garder les guards candidats car ils semblent fonctionner)
   { 
     path: 'candidate/login', 
     loadComponent: () => import('./pages/candidate/login/candidate-login.component').then(m => m.CandidateLoginComponent),

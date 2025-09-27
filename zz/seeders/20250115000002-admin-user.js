@@ -12,7 +12,7 @@ module.exports = {
         username: "admin",
         firstName: "Super",
         lastName: "Admin",
-        email: "arezgui1999@gamil.com",
+        email: "arezgui1999@gmail.com",
         password: hashedPassword, // Mot de passe hashé
         isActive: true,
         emailVerified: true,

@@ -76,7 +76,7 @@ export class CandidateRegisterComponent implements OnInit {
     this.loading = true;
     this.errorMessage = null;
 
-    // Convert camelCase to snake_case for the API request
+    
     const registerData = {
       firstName: this.registerForm.value.firstName,
       lastName: this.registerForm.value.lastName,

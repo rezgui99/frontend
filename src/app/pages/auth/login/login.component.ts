@@ -16,6 +16,7 @@ export class LoginComponent implements OnInit {
   loginForm: FormGroup;
   loading = false;
   errorMessage: string | null = null;
+  successMessage: string | null = null; // Ajouté pour le message de succès
   returnUrl: string = '/home';
   showPassword = false;
 
@@ -38,8 +39,12 @@ export class LoginComponent implements OnInit {
     
     // Afficher un message si l'email vient d'être vérifié
     if (this.route.snapshot.queryParams['emailVerified'] === 'true') {
-      // Vous pourriez ajouter un message de succès ici
-      console.log('Email vérifié avec succès');
+      this.successMessage = 'Email vérifié avec succès ! Vous pouvez maintenant vous connecter.';
+      
+      // Masquer le message après 5 secondes
+      setTimeout(() => {
+        this.successMessage = null;
+      }, 5000);
     }
     
     // Redirect if already logged in
@@ -74,15 +79,37 @@ export class LoginComponent implements OnInit {
       next: (response) => {
         console.log('Login successful:', response);
         
+        // NOUVEAU: Vérifier si la vérification email est requise
+        if (response.emailVerificationRequired) {
+          console.log('Email verification required - redirecting to verify-email');
+          this.router.navigate(['/auth/verify-email'], {
+            queryParams: { email: loginData.email }
+          });
+          return;
+        }
+        
         // Afficher un message si il y avait des activités suspectes
         if (response.hadSuspiciousActivity === true) {
           console.log('Connexion réussie après activité suspecte détectée');
         }
         
+        // Redirection normale vers l'application
         this.router.navigate([this.returnUrl]);
       },
       error: (error: ApiError) => {
         console.error('Login error:', error);
+        
+        // NOUVEAU: Gestion spéciale pour email non vérifié
+        if (error.error === 'Email non vérifié' || 
+            error.message?.includes('vérifier votre email') ||
+            error.message?.includes('Email non vérifié')) {
+          console.log('Email not verified - redirecting to verify-email');
+          this.router.navigate(['/auth/verify-email'], {
+            queryParams: { email: loginData.email }
+          });
+          return;
+        }
+        
         this.errorMessage = error.message || 'Erreur lors de la connexion';
         this.loading = false;
       },

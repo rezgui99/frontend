@@ -36,11 +36,14 @@ export class AuthService {
 
     console.log('🔍 AuthService - Loading from storage - Token:', token ? 'Found' : 'Not found');
     console.log('🔍 AuthService - Loading from storage - User:', user ? 'Found' : 'Not found');
+    
     if (token && user) {
       try {
+        const parsedUser = JSON.parse(user);
         this.tokenSubject.next(token);
-        this.currentUserSubject.next(JSON.parse(user));
+        this.currentUserSubject.next(parsedUser);
         console.log('✅ AuthService - Token and user loaded successfully');
+        console.log('📧 AuthService - Email verified:', parsedUser.emailVerified);
       } catch {
         console.error('❌ AuthService - Error parsing stored data, clearing');
         this.clearAuthData();
@@ -51,7 +54,10 @@ export class AuthService {
   }
 
   private setAuthData(token: string, user: User): void {
-    console.log('💾 AuthService - Setting auth data - Token:', token ? 'Present' : 'Missing');
+    console.log('💾 AuthService - Setting auth data');
+    console.log('🔑 Token:', token ? 'Present' : 'Missing');
+    console.log('👤 User:', user.email);
+    console.log('📧 Email verified:', user.emailVerified);
    
     localStorage.setItem('auth_token', token);
     localStorage.setItem('current_user', JSON.stringify(user));
@@ -60,6 +66,7 @@ export class AuthService {
   }
 
   private clearAuthData(): void {
+    console.log('🗑️ AuthService - Clearing auth data');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('current_user');
     this.tokenSubject.next(null);
@@ -67,15 +74,23 @@ export class AuthService {
   }
 
   private handleError(error: HttpErrorResponse): Observable<never> {
+    console.error('🚨 AuthService - HTTP Error:', error);
+    
     let errorMessage = 'Une erreur inattendue s\'est produite';
-    if (error.error?.message) errorMessage = error.error.message;
-    else if (error.message) errorMessage = error.message;
+    if (error.error?.message) {
+      errorMessage = error.error.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
 
-    return throwError(() => ({
+    const apiError: ApiError = {
       error: error.error?.error || 'Unknown error',
       message: errorMessage,
       details: error.error?.details || []
-    } as ApiError));
+    };
+
+    console.error('📝 AuthService - Formatted error:', apiError);
+    return throwError(() => apiError);
   }
 
   get currentUser(): User | null {
@@ -87,66 +102,130 @@ export class AuthService {
   }
 
   get isAuthenticated(): boolean {
-    return !!this.token && !!this.currentUser;
+    const hasToken = !!this.token;
+    const hasUser = !!this.currentUser;
+    const isEmailVerified = !!this.currentUser?.emailVerified;
+    
+    console.log('🔐 AuthService - Authentication check:');
+    console.log('  - Has token:', hasToken);
+    console.log('  - Has user:', hasUser);
+    console.log('  - Email verified:', isEmailVerified);
+    console.log('  - Is authenticated:', hasToken && hasUser && isEmailVerified);
+    
+    return hasToken && hasUser && isEmailVerified;
   }
 
   register(data: RegisterRequest): Observable<AuthResponse> {
+    console.log('📝 AuthService - Registering user:', data.email);
+    
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data)
       .pipe(
-        tap(res => this.setAuthData(res.token, res.user)),
+        tap(res => {
+          console.log('✅ Registration response received:', res);
+          console.log('📧 Email verification required:', res.emailVerificationRequired);
+          
+          // Ne pas connecter automatiquement lors de l'inscription
+          // L'utilisateur doit d'abord vérifier son email
+          if (res.token) {
+            console.log('⚠️ Token received but email verification required - not logging in');
+          }
+        }),
         catchError(err => this.handleError(err))
       );
   }
 
   login(data: LoginRequest): Observable<AuthResponse> {
+    console.log('🔑 AuthService - Logging in user:', data.email);
+    
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, data)
       .pipe(
         tap(res => {
-          console.log('✅ Login response:', res);
-          console.log('👤 User roles:', res.user.roles);
-          console.log('🎭 Primary role:', res.user.role);
-          console.log('🔑 Token received:', res.token ? 'Yes' : 'No');
-          this.setAuthData(res.token, res.user);
+          console.log('✅ Login response received:', res);
+          
+          // Vérifier si la vérification email est requise
+          if (res.emailVerificationRequired) {
+            console.log('📧 Email verification required - not logging in');
+            // Ne pas connecter l'utilisateur, rediriger vers vérification
+            return;
+          }
+          
+          if (res.token && res.user) {
+            console.log('👤 User roles:', res.user.roles);
+            console.log('🎭 Primary role:', res.user.role);
+            console.log('📧 Email verified:', res.user.emailVerified);
+            this.setAuthData(res.token, res.user);
+          } else {
+            console.log('⚠️ Login response missing token or user data');
+          }
         }),
         catchError(err => this.handleError(err))
       );
   }
 
   logout(): Observable<void> {
+    console.log('👋 AuthService - Logging out user');
     this.clearAuthData();
     this.router.navigate(['/auth/login']);
     return of();
   }
 
   forceLogout(): void {
+    console.log('🚨 AuthService - Force logout');
     this.clearAuthData();
     this.router.navigate(['/auth/login']);
   }
 
   forgotPassword(data: ForgotPasswordRequest): Observable<any> {
+    console.log('🔑 AuthService - Forgot password for:', data.email);
+    
     return this.http.post(`${this.apiUrl}/forgot-password`, data)
       .pipe(catchError(err => this.handleError(err)));
   }
 
   resetPassword(data: ResetPasswordRequest): Observable<any> {
+    console.log('🔄 AuthService - Resetting password');
+    
     return this.http.post(`${this.apiUrl}/reset-password`, data)
       .pipe(catchError(err => this.handleError(err)));
   }
 
   verifyEmail(data: { email: string; code: string }): Observable<any> {
-    return this.http.post(`${this.apiUrl}/verify-email`, data)
-      .pipe(catchError(err => this.handleError(err)));
+    console.log('📧 AuthService - Verifying email:', data.email);
+    console.log('🔢 AuthService - Verification code:', data.code);
+    
+    return this.http.post<AuthResponse>(`${this.apiUrl}/verify-email`, data)
+      .pipe(
+        tap(res => {
+          console.log('✅ Email verification response received:', res);
+          
+          // Si un token est retourné, connecter automatiquement l'utilisateur
+          if (res.token && res.user) {
+            console.log('🔐 Auto-login after email verification');
+            console.log('👤 Verified user:', res.user.email);
+            console.log('📧 Email verified status:', res.user.emailVerified);
+            this.setAuthData(res.token, res.user);
+          } else {
+            console.log('⚠️ Email verification response missing token or user');
+          }
+        }),
+        catchError(err => this.handleError(err))
+      );
   }
 
   resendVerificationCode(data: { email: string }): Observable<any> {
+    console.log('📮 AuthService - Resending verification code to:', data.email);
+    
     return this.http.post(`${this.apiUrl}/resend-verification`, data)
       .pipe(catchError(err => this.handleError(err)));
   }
 
   getProfile(): Observable<{ user: User }> {
+    console.log('👤 AuthService - Getting user profile');
+    
     return this.http.get<{ user: User }>(`${this.apiUrl}/profile`)
       .pipe(
         tap(res => {
+          console.log('✅ Profile received:', res.user.email);
           this.currentUserSubject.next(res.user);
           localStorage.setItem('current_user', JSON.stringify(res.user));
         }),
@@ -155,9 +234,12 @@ export class AuthService {
   }
 
   updateProfile(data: UpdateProfileRequest): Observable<{ message: string; user: User }> {
+    console.log('📝 AuthService - Updating profile');
+    
     return this.http.put<{ message: string; user: User }>(`${this.apiUrl}/profile`, data)
       .pipe(
         tap(res => {
+          console.log('✅ Profile updated:', res.user.email);
           this.currentUserSubject.next(res.user);
           localStorage.setItem('current_user', JSON.stringify(res.user));
         }),
@@ -167,28 +249,42 @@ export class AuthService {
 
   hasRole(role: string): boolean {
     const user = this.currentUser;
-    if (!user) return false;
+    if (!user) {
+      console.log('🔒 AuthService - No user for role check');
+      return false;
+    }
     
     // Vérifier dans le tableau des rôles
     if (user.roles && Array.isArray(user.roles)) {
-      return user.roles.includes(role);
+      const hasRole = user.roles.includes(role);
+      console.log(`🔒 AuthService - Role check (${role}):`, hasRole, '- User roles:', user.roles);
+      return hasRole;
     }
     
     // Si l'utilisateur a un rôle simple
-    return user.role === role;
+    const hasRole = user.role === role;
+    console.log(`🔒 AuthService - Simple role check (${role}):`, hasRole, '- User role:', user.role);
+    return hasRole;
   }
 
   hasAnyRole(roles: string[]): boolean {
     const user = this.currentUser;
-    if (!user) return false;
+    if (!user) {
+      console.log('🔒 AuthService - No user for role check');
+      return false;
+    }
     
     // Vérifier dans le tableau des rôles
     if (user.roles && Array.isArray(user.roles)) {
-      return roles.some(role => user.roles.includes(role));
+      const hasAnyRole = roles.some(role => user.roles.includes(role));
+      console.log(`🔒 AuthService - Any role check (${roles.join(', ')}):`, hasAnyRole, '- User roles:', user.roles);
+      return hasAnyRole;
     }
     
     // Si l'utilisateur a un rôle simple
-    return roles.includes(user.role);
+    const hasAnyRole = roles.includes(user.role);
+    console.log(`🔒 AuthService - Simple any role check (${roles.join(', ')}):`, hasAnyRole, '- User role:', user.role);
+    return hasAnyRole;
   }
 
   get isAdmin(): boolean {
@@ -197,5 +293,42 @@ export class AuthService {
 
   get isHR(): boolean {
     return this.hasRole('hr') || this.hasRole('admin');
+  }
+
+  // Méthode utilitaire pour vérifier si l'utilisateur a un email vérifié
+  get hasVerifiedEmail(): boolean {
+    return !!this.currentUser?.emailVerified;
+  }
+
+  // Méthode pour obtenir l'email de l'utilisateur actuel
+  get userEmail(): string | null {
+    return this.currentUser?.email || null;
+  }
+
+  // Méthode pour rafraîchir les données utilisateur
+  refreshUser(): Observable<{ user: User }> {
+    console.log('🔄 AuthService - Refreshing user data');
+    return this.getProfile();
+  }
+
+  // Méthode pour vérifier si le token est expiré
+  isTokenExpired(): boolean {
+    // Cette méthode pourrait être étendue pour décoder et vérifier l'expiration du JWT
+    const token = this.token;
+    if (!token) return true;
+    
+    try {
+      // Décoder la partie payload du JWT (base64)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const exp = payload.exp * 1000; // Convertir en millisecondes
+      const now = Date.now();
+      
+      const isExpired = now >= exp;
+      console.log('🕐 AuthService - Token expiration check:', isExpired ? 'EXPIRED' : 'VALID');
+      return isExpired;
+    } catch (error) {
+      console.error('❌ AuthService - Error checking token expiration:', error);
+      return true; // En cas d'erreur, considérer le token comme expiré
+    }
   }
 }

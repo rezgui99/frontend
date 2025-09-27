@@ -92,17 +92,15 @@ export class RegisterComponent implements OnInit {
     this.authService.register(registerData).subscribe({
       next: (response) => {
         console.log('Registration successful:', response);
-        console.log('Utilisateur créé avec le rôle:', response.user.role);
-        console.log('Rôles disponibles:', response.user.roles);
+        console.log('Email verification required:', response.emailVerificationRequired);
         
-        // Rediriger vers la vérification email si nécessaire
-        if (response.emailVerificationRequired === true) {
+        // Toujours rediriger vers la vérification email après inscription
+        if (response.emailVerificationRequired) {
+          console.log('Redirecting to email verification...');
           this.router.navigate(['/auth/verify-email'], {
             queryParams: { email: this.registerForm.value.email }
           });
-        } else {
-          this.router.navigate(['/home']);
-        }
+        } 
       },
       error: (error: ApiError) => {
         console.error('Registration error:', error);

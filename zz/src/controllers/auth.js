@@ -25,15 +25,14 @@ transporter.verify((err, success) => {
   else console.log('Serveur email prêt à envoyer des emails');
 });
 
-// --- Helper pour hash du mot de passe ---
-// Les hooks sont maintenant définis dans le modèle User
-
 // --- Register new user ---
 const register = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
     const { firstName, lastName, email, password, confirmPassword } = req.body;
+
+    console.log('📝 Register - New user registration attempt for:', email);
 
     // Validations
     if (!firstName || !lastName || !email || !password) {
@@ -65,6 +64,8 @@ const register = async (req, res) => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    console.log('🔢 Register - Generated verification code for:', email);
+
     // Création utilisateur
     const user = await User.create({
       username,
@@ -77,6 +78,8 @@ const register = async (req, res) => {
       emailVerificationCode: verificationCode,
       emailVerificationExpires: verificationExpires
     }, { transaction: t });
+
+    console.log('👤 Register - User created with ID:', user.id);
 
     // Envoyer l'email avec le code
     try {
@@ -101,9 +104,8 @@ const register = async (req, res) => {
         role_id: hrRole.id,
         assigned_by: user.id // Auto-assigné
       }, { transaction: t });
+      console.log('🎭 Register - HR role assigned to user:', user.id);
     }
-
-    const token = generateToken(user.id);
 
     // Récupérer l'utilisateur avec ses rôles pour la réponse
     const userWithRoles = await User.findByPk(user.id, {
@@ -119,17 +121,20 @@ const register = async (req, res) => {
 
     const userRoles = userWithRoles?.roles?.map(role => role.name) || [];
     const userResponse = {
-      ...user.toJSON(),
+      ...userWithRoles.toJSON(),
       role: userRoles.includes('admin') ? 'admin' : 'hr',
       roles: userRoles
     };
 
     await t.commit();
+    
+    console.log('✅ Register - User registration completed for:', email);
+    
     res.status(201).json({ 
       message: 'Utilisateur créé avec succès. Vérifiez votre email pour confirmer votre inscription.', 
       user: userResponse, 
-      token,
-      emailVerificationRequired: true
+      token: null, // Pas de token tant que l'email n'est pas vérifié
+      emailVerificationRequired: true // Toujours true pour les nouveaux comptes
     });
 
   } catch (error) {
@@ -157,18 +162,27 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('🔑 Login - Login attempt for:', email);
+
     if (!email || !password) {
       return res.status(400).json({ error: 'Email et mot de passe requis' });
     }
 
     const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+    if (!user) {
+      console.log('❌ Login - User not found:', email);
+      return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+    }
 
-    if (!user.isActive) return res.status(401).json({ error: 'Votre compte a été désactivé' });
+    if (!user.isActive) {
+      console.log('❌ Login - User account disabled:', email);
+      return res.status(401).json({ error: 'Votre compte a été désactivé' });
+    }
 
     // Vérifier si le compte est verrouillé
     if (securityService.isAccountLocked(user)) {
       const remainingTime = securityService.getLockTimeRemaining(user);
+      console.log('🔒 Login - Account locked:', email);
       return res.status(401).json({ 
         error: `Compte temporairement verrouillé. Réessayez dans ${remainingTime} minute(s).`,
         lockTimeRemaining: remainingTime
@@ -177,6 +191,8 @@ const login = async (req, res) => {
 
     const isPasswordValid = await user.checkPassword(password);
     if (!isPasswordValid) {
+      console.log('❌ Login - Invalid password for:', email);
+      
       // Analyser la tentative échouée avec le service de sécurité
       const result = await securityService.analyzeLoginAttempt(
         user, 
@@ -194,6 +210,16 @@ const login = async (req, res) => {
       }
       
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+    }
+
+    // Vérifier si l'email est vérifié
+    if (!user.emailVerified) {
+      console.log('📧 Login - Email not verified for:', email);
+      return res.status(401).json({ 
+        error: 'Votre email n\'est pas encore vérifié',
+        emailVerificationRequired: true,
+        email: user.email
+      });
     }
 
     // Analyser la connexion réussie
@@ -257,6 +283,8 @@ const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
 
+    console.log('📧 VerifyEmail - Verification attempt for:', email, 'with code:', code);
+
     if (!email || !code) {
       await t.rollback();
       return res.status(400).json({ error: 'Email et code de vérification requis' });
@@ -270,22 +298,26 @@ const verifyEmail = async (req, res) => {
     const user = await User.findOne({ where: { email }, transaction: t });
     if (!user) {
       await t.rollback();
+      console.log('❌ VerifyEmail - User not found:', email);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
     if (user.emailVerified) {
       await t.rollback();
+      console.log('⚠️ VerifyEmail - Email already verified:', email);
       return res.status(400).json({ error: 'Email déjà vérifié' });
     }
 
     // Vérifier le code et l'expiration
     if (user.emailVerificationCode !== code) {
       await t.rollback();
+      console.log('❌ VerifyEmail - Invalid code for:', email);
       return res.status(400).json({ error: 'Code de vérification invalide ou expiré' });
     }
 
     if (new Date() > new Date(user.emailVerificationExpires)) {
       await t.rollback();
+      console.log('⏰ VerifyEmail - Expired code for:', email);
       return res.status(400).json({ error: 'Code de vérification expiré' });
     }
 
@@ -293,13 +325,34 @@ const verifyEmail = async (req, res) => {
     await user.update({
       emailVerified: true,
       emailVerificationCode: null,
-      emailVerificationExpires: null
+      emailVerificationExpires: null,
+      lastLogin: new Date() // Mettre à jour lastLogin pour connexion automatique
     }, { transaction: t });
 
-    // Mettre à jour lastLogin pour permettre l'accès immédiat
-    await user.update({
-      lastLogin: new Date()
-    }, { transaction: t });
+    console.log('✅ VerifyEmail - Email verified for:', email);
+
+    // Récupérer l'utilisateur avec ses rôles pour la réponse
+    const userWithRoles = await User.findByPk(user.id, {
+      include: [{
+        model: db.Role,
+        as: 'roles',
+        where: { is_active: true },
+        required: false,
+        through: { attributes: [] }
+      }],
+      transaction: t
+    });
+
+    const userRoles = userWithRoles?.roles?.map(role => role.name) || [];
+    const userResponse = {
+      ...userWithRoles.toJSON(),
+      role: userRoles.includes('admin') ? 'admin' : 'hr',
+      roles: userRoles
+    };
+
+    // Générer un token pour connexion automatique
+    const token = generateToken(user.id);
+    console.log('🔐 VerifyEmail - Token generated for auto-login:', email);
 
     // Envoyer email de confirmation
     try {
@@ -309,14 +362,21 @@ const verifyEmail = async (req, res) => {
         user.lastName,
         'user'
       );
+      console.log('📧 VerifyEmail - Confirmation email sent to:', email);
     } catch (emailError) {
       console.error('Erreur envoi confirmation email:', emailError);
     }
 
     await t.commit();
+    
+    console.log('🎉 VerifyEmail - Process completed successfully for:', email);
+    
     res.json({ 
-      message: 'Email vérifié avec succès ! Vous pouvez maintenant vous connecter.',
-      emailVerified: true
+      message: 'Email vérifié avec succès ! Connexion automatique...',
+      emailVerified: true,
+      token: token,
+      user: userResponse,
+      autoLogin: true // Indicateur pour le frontend
     });
 
   } catch (error) {
@@ -333,6 +393,8 @@ const resendVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
 
+    console.log('📮 ResendCode - Resend request for:', email);
+
     if (!email) {
       await t.rollback();
       return res.status(400).json({ error: 'Email requis' });
@@ -341,11 +403,13 @@ const resendVerificationCode = async (req, res) => {
     const user = await User.findOne({ where: { email }, transaction: t });
     if (!user) {
       await t.rollback();
+      console.log('❌ ResendCode - User not found:', email);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
     if (user.emailVerified) {
       await t.rollback();
+      console.log('⚠️ ResendCode - Email already verified:', email);
       return res.status(400).json({ error: 'Email déjà vérifié' });
     }
 
@@ -358,6 +422,8 @@ const resendVerificationCode = async (req, res) => {
       emailVerificationExpires: verificationExpires
     }, { transaction: t });
 
+    console.log('🔢 ResendCode - New code generated for:', email);
+
     // Envoyer le nouveau code
     try {
       await emailService.sendVerificationCode(
@@ -367,6 +433,7 @@ const resendVerificationCode = async (req, res) => {
         verificationCode,
         'user'
       );
+      console.log('📧 ResendCode - New code sent to:', email);
     } catch (emailError) {
       console.error('Erreur renvoi code:', emailError);
       await t.rollback();
@@ -374,6 +441,7 @@ const resendVerificationCode = async (req, res) => {
     }
 
     await t.commit();
+    console.log('✅ ResendCode - Process completed for:', email);
     res.json({ message: 'Nouveau code de vérification envoyé' });
 
   } catch (error) {
@@ -389,10 +457,16 @@ const forgotPassword = async (req, res) => {
 
   try {
     const { email } = req.body;
+    
+    console.log('🔑 ForgotPassword - Request for:', email);
+    
     if (!email) return res.status(400).json({ error: 'Email requis' });
 
     const user = await User.findOne({ where: { email }, transaction: t });
-    if (!user) return res.json({ message: 'Si cet email existe, un lien de réinitialisation a été envoyé' });
+    if (!user) {
+      console.log('❌ ForgotPassword - User not found:', email);
+      return res.json({ message: 'Si cet email existe, un lien de réinitialisation a été envoyé' });
+    }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpires = new Date(Date.now() + 3600000);
@@ -418,6 +492,8 @@ const forgotPassword = async (req, res) => {
       `
     });
 
+    console.log('📧 ForgotPassword - Reset link sent to:', email);
+    
     await t.commit();
     res.json({ message: 'Si cet email existe, un lien de réinitialisation a été envoyé' });
 
@@ -434,6 +510,9 @@ const resetPassword = async (req, res) => {
 
   try {
     const { token, newPassword, confirmPassword } = req.body;
+    
+    console.log('🔄 ResetPassword - Password reset attempt with token');
+    
     if (!token || !newPassword || !confirmPassword) {
       await t.rollback();
       return res.status(400).json({ error: 'Tous les champs sont requis' });
@@ -459,10 +538,18 @@ const resetPassword = async (req, res) => {
 
     if (!user) {
       await t.rollback();
+      console.log('❌ ResetPassword - Invalid or expired token');
       return res.status(400).json({ error: 'Token invalide ou expiré' });
     }
 
-    await user.update({ password: newPassword, resetPasswordToken: null, resetPasswordExpires: null }, { transaction: t });
+    await user.update({ 
+      password: newPassword, 
+      resetPasswordToken: null, 
+      resetPasswordExpires: null 
+    }, { transaction: t });
+    
+    console.log('✅ ResetPassword - Password updated for user:', user.email);
+    
     await t.commit();
 
     res.json({ message: 'Mot de passe réinitialisé avec succès' });
@@ -476,7 +563,15 @@ const resetPassword = async (req, res) => {
 // --- Profile ---
 const getProfile = async (req, res) => {
   try {
+    console.log('👤 GetProfile - Request for user ID:', req.user.id);
+    
     const user = await User.findByPk(req.user.id);
+    if (!user) {
+      console.log('❌ GetProfile - User not found:', req.user.id);
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    
+    console.log('✅ GetProfile - Profile retrieved for:', user.email);
     res.json({ user: user.toJSON() });
   } catch (error) {
     console.error('Erreur get profile:', error);
@@ -489,7 +584,14 @@ const updateProfile = async (req, res) => {
 
   try {
     const { firstName, lastName, email, currentPassword, newPassword } = req.body;
+    
+    console.log('📝 UpdateProfile - Update request for user ID:', req.user.id);
+    
     const user = await User.findByPk(req.user.id, { transaction: t });
+    if (!user) {
+      await t.rollback();
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
 
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
@@ -501,7 +603,8 @@ const updateProfile = async (req, res) => {
         return res.status(409).json({ error: 'Cet email est déjà utilisé' });
       }
       user.email = email;
-      user.emailVerified = false;
+      user.emailVerified = false; // Requerir la vérification pour le nouvel email
+      console.log('📧 UpdateProfile - Email changed, verification required');
     }
 
     if (newPassword) {
@@ -522,11 +625,14 @@ const updateProfile = async (req, res) => {
       }
 
       user.password = newPassword;
+      console.log('🔑 UpdateProfile - Password updated');
     }
 
     await user.save({ transaction: t });
     await t.commit();
 
+    console.log('✅ UpdateProfile - Profile updated for:', user.email);
+    
     res.json({ message: 'Profil mis à jour avec succès', user: user.toJSON() });
   } catch (error) {
     await t.rollback();
@@ -538,6 +644,7 @@ const updateProfile = async (req, res) => {
 // --- Logout ---
 const logout = async (req, res) => {
   try {
+    console.log('👋 Logout - User logout request');
     res.json({ message: 'Déconnexion réussie' });
   } catch (error) {
     console.error('Erreur logout:', error);

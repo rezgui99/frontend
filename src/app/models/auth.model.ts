@@ -8,7 +8,7 @@ export interface User {
   isActive: boolean;
   isVerified: boolean;
   lastLogin?: string;
-  emailVerified: boolean;
+  emailVerified: boolean; // Cette propriété est cruciale
   createdAt: string;
   updatedAt: string;
 }
@@ -27,10 +27,10 @@ export interface RegisterRequest {
 }
 
 export interface AuthResponse {
-  emailVerificationRequired: boolean;
+  emailVerificationRequired?: boolean; // Ajouté comme optionnel pour compatibilité
   message: string;
-  user: User;
-  token: string;
+  user?: User; // Optionnel car pas toujours présent
+  token?: string; // Optionnel car pas toujours présent
   hadSuspiciousActivity?: boolean;
   isVerified?: boolean;
 }
