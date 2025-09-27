@@ -1,0 +1,243 @@
+/* Additional employees page styles if needed */
+
+/* Styles pour les médailles de classement */
+.bg-gold {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+}
+
+.bg-silver {
+  background: linear-gradient(135deg, #C0C0C0, #A8A8A8);
+}
+
+.bg-bronze {
+  background: linear-gradient(135deg, #CD7F32, #B8860B);
+}
+
+/* Animation pour les barres de progression */
+.transition-all {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Styles pour le modal */
+.max-h-96 {
+  max-height: 24rem;
+}
+
+/* Hover effects pour les cartes de matching */
+.hover\:bg-gray-50:hover {
+  background-color: #f9fafb;
+}
+
+/* Styles pour les badges de compétences */
+.bg-green-50 {
+  background-color: #f0fdf4;
+}
+
+.bg-red-50 {
+  background-color: #fef2f2;
+}
+
+.text-green-800 {
+  color: #166534;
+}
+
+.text-red-800 {
+  color: #991b1b;
+}
+
+/* Styles pour les boutons d'action */
+.action-button {
+  transition: all 0.2s ease-in-out;
+}
+
+.action-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles pour les compétences dans le tableau */
+.skill-item {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  margin-bottom: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.skill-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.skill-item:hover .skill-actions {
+  opacity: 1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .table-container {
+    overflow-x: auto;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .action-buttons button {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Loading states */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* Animation pour les notifications */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-enter {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Styles pour l'affichage des compétences */
+.skill-item {
+  transition: all 0.2s ease-in-out;
+}
+
+.skill-item:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.group:hover .group-hover\:opacity-100 {
+  opacity: 1 !important;
+}
+
+/* Styles pour les badges de niveau */
+.level-badge {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Animation pour les actions de compétences */
+.skill-actions {
+  transition: all 0.2s ease-in-out;
+}
+
+.skill-actions button {
+  transition: all 0.15s ease-in-out;
+}
+
+.skill-actions button:hover {
+  transform: scale(1.1);
+}
+
+/* Styles pour les certifications */
+.certification-indicator {
+  position: relative;
+}
+
+.certification-indicator::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  background-color: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+/* Responsive pour les compétences */
+@media (max-width: 768px) {
+  .skill-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .skill-actions {
+    opacity: 1;
+    align-self: flex-end;
+  }
+}
+/* Styles pour les médailles de classement */
+.bg-gold {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+}
+
+.bg-silver {
+  background: linear-gradient(135deg, #C0C0C0, #A8A8A8);
+}
+
+.bg-bronze {
+  background: linear-gradient(135deg, #CD7F32, #B8860B);
+}
+
+/* Animation pour les barres de progression */
+.transition-all {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Styles pour le modal */
+.max-h-96 {
+  max-height: 24rem;
+}
+
+/* Hover effects pour les cartes de matching */
+.hover\:bg-gray-50:hover {
+  background-color: #f9fafb;
+}
+
+/* Styles pour les badges de compétences */
+.bg-green-50 {
+  background-color: #f0fdf4;
+}
+
+.bg-red-50 {
+  background-color: #fef2f2;
+}
+
+.text-green-800 {
+  color: #166534;
+}
+
+.text-red-800 {
+  color: #991b1b;
+}

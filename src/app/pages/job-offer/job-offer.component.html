@@ -1,0 +1,463 @@
+<div class="p-6 max-w-6xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h2 class="text-3xl font-bold text-primary">📝 Créer une Offre d'Emploi</h2>
+      <p class="text-gray-600 mt-2">Générez une annonce attractive à partir d'une fiche de poste</p>
+    </div>
+    <div class="flex space-x-3">
+      <button (click)="togglePreview()" 
+              class="btn btn-secondary"
+              title="Prévisualiser l'offre avant publication">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        {{ previewMode ? 'Éditer' : 'Prévisualiser' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div *ngIf="errorMessage" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
+    {{ errorMessage }}
+  </div>
+
+  <div *ngIf="successMessage" class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md">
+    {{ successMessage }}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Formulaire principal -->
+    <div class="lg:col-span-2">
+      <div *ngIf="!previewMode">
+        <form [formGroup]="jobOfferForm" (ngSubmit)="onSubmit()">
+          <!-- Sélection de la fiche de poste -->
+          <div class="card mb-6">
+            <h3 class="text-lg font-semibold text-dark mb-4">🎯 Fiche de Poste Source</h3>
+            <div>
+              <label class="block text-gray-700 text-sm font-bold mb-2">
+                Sélectionner une fiche de poste *
+                <span class="text-xs text-gray-500 font-normal ml-2">
+                  (Les informations et compétences seront pré-remplies automatiquement)
+                </span>
+              </label>
+              <select formControlName="job_description_id" 
+                      (change)="onJobDescriptionChange()"
+                      class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="">-- Choisir une fiche de poste --</option>
+                <option *ngFor="let job of jobDescriptions" [value]="job.id">
+                  {{ job.emploi }} - {{ job.filiere_activite }} 
+                  <span *ngIf="job.requiredSkills">({{ job.requiredSkills.length }} compétences)</span>
+                </option>
+              </select>
+              <div *ngIf="getFieldError('job_description_id')" class="text-red-500 text-xs mt-1">
+                {{ getFieldError('job_description_id') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Informations générales -->
+          <div class="card mb-6">
+            <h3 class="text-lg font-semibold text-dark mb-4">📋 Informations Générales</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Titre de l'offre *
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Titre accrocheur pour attirer les candidats)
+                  </span>
+                </label>
+                <input type="text" formControlName="title" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                       placeholder="Ex: Développeur Full Stack - Équipe Innovation">
+                <div *ngIf="getFieldError('title')" class="text-red-500 text-xs mt-1">
+                  {{ getFieldError('title') }}
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Entreprise *
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Nom de votre organisation)
+                  </span>
+                </label>
+                <input type="text" formControlName="company" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                <div *ngIf="getFieldError('company')" class="text-red-500 text-xs mt-1">
+                  {{ getFieldError('company') }}
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Localisation *
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Lieu de travail principal)
+                  </span>
+                </label>
+                <input type="text" formControlName="location" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                       placeholder="Ex: Tunis, Sfax, Télétravail...">
+                <div class="mt-2">
+                  <p class="text-xs text-gray-500 mb-1">Suggestions :</p>
+                  <div class="flex flex-wrap gap-1">
+                    <button *ngFor="let suggestion of getLocationSuggestions()" 
+                            type="button"
+                            (click)="applyLocationSuggestion(suggestion)"
+                            class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded">
+                      {{ suggestion }}
+                    </button>
+                  </div>
+                </div>
+                <div *ngIf="getFieldError('location')" class="text-red-500 text-xs mt-1">
+                  {{ getFieldError('location') }}
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Date limite de candidature *
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Délai pour postuler)
+                  </span>
+                </label>
+                <input type="date" formControlName="application_deadline" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                <div *ngIf="getFieldError('application_deadline')" class="text-red-500 text-xs mt-1">
+                  {{ getFieldError('application_deadline') }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conditions d'emploi -->
+          <div class="card mb-6">
+            <h3 class="text-lg font-semibold text-dark mb-4">💼 Conditions d'Emploi</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Type de contrat *
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Nature juridique du contrat)
+                  </span>
+                </label>
+                <select formControlName="contract_type" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option *ngFor="let type of contractTypes" [value]="type.value">
+                    {{ type.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Mode de travail *
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Organisation du travail)
+                  </span>
+                </label>
+                <select formControlName="work_mode" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option *ngFor="let mode of workModes" [value]="mode.value">
+                    {{ mode.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Salaire minimum (€/an)
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Optionnel - Fourchette basse)
+                  </span>
+                </label>
+                <input type="number" formControlName="salary_min" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                       placeholder="Ex: 35000">
+              </div>
+
+              <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Salaire maximum (€/an)
+                  <span class="text-xs text-gray-500 font-normal ml-2">
+                    (Optionnel - Fourchette haute)
+                  </span>
+                </label>
+                <input type="number" formControlName="salary_max" 
+                       class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                       placeholder="Ex: 50000">
+                <button type="button" (click)="applySuggestedSalary()" 
+                        class="mt-2 text-xs bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded text-blue-700"
+                        title="Appliquer une fourchette salariale suggérée basée sur le poste">
+                  💡 Suggestion automatique
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description du poste -->
+          <div class="card mb-6">
+            <h3 class="text-lg font-semibold text-dark mb-4">📝 Description du Poste</h3>
+            <div>
+              <label class="block text-gray-700 text-sm font-bold mb-2">
+                Description complète *
+                <span class="text-xs text-gray-500 font-normal ml-2">
+                  (Présentation détaillée du poste et des missions)
+                </span>
+              </label>
+              <textarea formControlName="description" rows="8" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Décrivez le poste, les missions, l'environnement de travail..."></textarea>
+              <div class="text-xs text-gray-500 mt-1">
+                {{ jobOfferForm.get('description')?.value?.length || 0 }} caractères (minimum 50)
+              </div>
+              <div *ngIf="getFieldError('description')" class="text-red-500 text-xs mt-1">
+                {{ getFieldError('description') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Exigences -->
+          <div class="card mb-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-dark">✅ Exigences et Prérequis</h3>
+              <button type="button" (click)="addRequirement()" 
+                      class="btn btn-secondary"
+                      title="Ajouter une nouvelle exigence pour le poste">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Ajouter exigence
+              </button>
+            </div>
+            <div formArrayName="requirements" class="space-y-3">
+              <div *ngFor="let requirement of requirementsArray.controls; let i = index" 
+                   class="flex items-center space-x-3">
+                <div class="flex-1">
+                  <input type="text" [formControlName]="i" 
+                         class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                         placeholder="Ex: Maîtrise de JavaScript, 3 ans d'expérience...">
+                </div>
+                <button type="button" (click)="removeRequirement(i)" 
+                        class="btn bg-red-500 text-white hover:bg-red-600"
+                        title="Supprimer cette exigence">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div *ngIf="requirementsArray.length === 0" class="text-center text-gray-500 py-4">
+              Aucune exigence définie. Cliquez sur "Ajouter exigence" pour commencer.
+            </div>
+          </div>
+
+          <!-- Avantages -->
+          <div class="card mb-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-dark">🎁 Avantages et Bénéfices</h3>
+              <button type="button" (click)="addBenefit()" 
+                      class="btn btn-secondary"
+                      title="Ajouter un avantage attractif pour les candidats">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Ajouter avantage
+              </button>
+            </div>
+            <div formArrayName="benefits" class="space-y-3">
+              <div *ngFor="let benefit of benefitsArray.controls; let i = index" 
+                   class="flex items-center space-x-3">
+                <div class="flex-1">
+                  <input type="text" [formControlName]="i" 
+                         class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                         placeholder="Ex: Télétravail partiel, Formation continue...">
+                </div>
+                <button type="button" (click)="removeBenefit(i)" 
+                        class="btn bg-red-500 text-white hover:bg-red-600"
+                        title="Supprimer cet avantage">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex justify-end space-x-4">
+            <button type="button" (click)="saveDraft()" 
+                    [disabled]="saving"
+                    class="btn btn-secondary"
+                    title="Sauvegarder comme brouillon pour finaliser plus tard">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              {{ saving ? 'Sauvegarde...' : 'Sauvegarder brouillon' }}
+            </button>
+            <button type="button" (click)="publishOffer()" 
+                    [disabled]="!jobOfferForm.valid || saving"
+                    class="btn btn-primary bg-green-600 hover:bg-green-700"
+                    title="Publier l'offre immédiatement pour recevoir des candidatures">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
+              </svg>
+              {{ saving ? 'Publication...' : '📢 Publier maintenant' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Mode prévisualisation -->
+      <div *ngIf="previewMode" class="card">
+        <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-lg">
+          <h1 class="text-2xl font-bold mb-2">{{ jobOfferForm.get('title')?.value || 'Titre de l\'offre' }}</h1>
+          <div class="flex items-center space-x-4 text-blue-100">
+            <span>🏢 {{ jobOfferForm.get('company')?.value || 'Entreprise' }}</span>
+            <span>📍 {{ jobOfferForm.get('location')?.value || 'Localisation' }}</span>
+            <span>📅 Jusqu'au {{ jobOfferForm.get('application_deadline')?.value | date:'dd/MM/yyyy' }}</span>
+          </div>
+        </div>
+        
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="text-center p-4 bg-blue-50 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600">{{ jobOfferForm.get('contract_type')?.value }}</div>
+              <div class="text-sm text-gray-600">Type de contrat</div>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+              <div class="text-2xl font-bold text-green-600">{{ jobOfferForm.get('work_mode')?.value }}</div>
+              <div class="text-sm text-gray-600">Mode de travail</div>
+            </div>
+            <div class="text-center p-4 bg-yellow-50 rounded-lg" *ngIf="jobOfferForm.get('salary_min')?.value">
+              <div class="text-2xl font-bold text-yellow-600">
+                {{ jobOfferForm.get('salary_min')?.value | number }}€ - {{ jobOfferForm.get('salary_max')?.value | number }}€
+              </div>
+              <div class="text-sm text-gray-600">Salaire annuel</div>
+            </div>
+          </div>
+
+          <div class="prose max-w-none mb-6">
+            <h3 class="text-lg font-semibold text-dark mb-3">Description du poste</h3>
+            <div class="whitespace-pre-wrap text-gray-700">{{ jobOfferForm.get('description')?.value }}</div>
+          </div>
+
+          <div *ngIf="requirementsArray.length > 0" class="mb-6">
+            <h3 class="text-lg font-semibold text-dark mb-3">Profil recherché</h3>
+            <ul class="list-disc list-inside space-y-2">
+              <li *ngFor="let requirement of requirementsArray.controls" class="text-gray-700">
+                {{ requirement.value }}
+              </li>
+            </ul>
+          </div>
+
+          <div *ngIf="benefitsArray.length > 0">
+            <h3 class="text-lg font-semibold text-dark mb-3">Ce que nous offrons</h3>
+            <ul class="list-disc list-inside space-y-2">
+              <li *ngFor="let benefit of benefitsArray.controls" class="text-gray-700">
+                {{ benefit.value }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panneau d'aide et suggestions -->
+    <div class="lg:col-span-1">
+      <div class="card sticky top-6">
+        <h3 class="text-lg font-semibold text-dark mb-4">💡 Assistant Intelligent</h3>
+        
+        <!-- Informations sur la fiche sélectionnée -->
+        <div *ngIf="selectedJobDescription" class="mb-6 p-4 bg-blue-50 rounded-lg">
+          <h4 class="font-semibold text-blue-800 mb-2">Fiche de poste sélectionnée</h4>
+          <div class="text-sm text-blue-700 space-y-1">
+            <p><strong>Emploi :</strong> {{ selectedJobDescription.emploi }}</p>
+            <p><strong>Filière :</strong> {{ selectedJobDescription.filiere_activite }}</p>
+            <p><strong>Famille :</strong> {{ selectedJobDescription.famille }}</p>
+            <div *ngIf="selectedJobDescription.requiredSkills && selectedJobDescription.requiredSkills.length > 0" class="mt-2">
+              <p class="font-medium text-blue-800 mb-1">{{ selectedJobDescription.requiredSkills.length }} compétences requises :</p>
+              <div class="space-y-1">
+                <div *ngFor="let skill of selectedJobDescription.requiredSkills.slice(0, 3)" 
+                     class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">
+                  {{ getSkillNameFromRequiredSkill(skill) }} - {{ getSkillNameFromRequiredSkill(skill) }}
+                </div>
+                <div *ngIf="selectedJobDescription.requiredSkills.length > 3" 
+                     class="text-xs text-blue-600">
+                  +{{ selectedJobDescription.requiredSkills.length - 3 }} autres compétences...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Suggestions de salaire -->
+        <div class="mb-6 p-4 bg-green-50 rounded-lg">
+          <h4 class="font-semibold text-green-800 mb-2">💰 Suggestion Salariale</h4>
+          <div class="text-sm text-green-700">
+            <p>Fourchette recommandée :</p>
+            <p class="font-bold">{{ getSalaryRange().min | number }}€ - {{ getSalaryRange().max | number }}€</p>
+            <button type="button" (click)="applySuggestedSalary()" 
+                    class="mt-2 text-xs bg-green-200 hover:bg-green-300 px-2 py-1 rounded">
+              Appliquer cette fourchette
+            </button>
+          </div>
+        </div>
+
+        <!-- Conseils de rédaction -->
+        <div class="mb-6 p-4 bg-yellow-50 rounded-lg">
+          <h4 class="font-semibold text-yellow-800 mb-2">✍️ Conseils de Rédaction</h4>
+          <ul class="text-sm text-yellow-700 space-y-2">
+            <li>• Utilisez un titre accrocheur et spécifique</li>
+            <li>• Mentionnez les technologies principales</li>
+            <li>• Décrivez l'environnement de travail</li>
+            <li>• Mettez en avant les opportunités d'évolution</li>
+            <li>• Soyez transparent sur les conditions</li>
+          </ul>
+        </div>
+
+        <!-- Statut de publication -->
+        <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+          <h4 class="font-semibold text-blue-800 mb-2">📊 Statut de Publication</h4>
+          <div class="text-sm text-blue-700 space-y-2">
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-yellow-400 rounded-full mr-2"></span>
+              <span><strong>Brouillon :</strong> Visible uniquement par vous</span>
+            </div>
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-green-400 rounded-full mr-2"></span>
+              <span><strong>Publiée :</strong> Visible publiquement, candidatures ouvertes</span>
+            </div>
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-red-400 rounded-full mr-2"></span>
+              <span><strong>Fermée :</strong> Plus de candidatures acceptées</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Statistiques -->
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <h4 class="font-semibold text-gray-800 mb-2">📊 Aperçu</h4>
+          <div class="text-sm text-gray-700 space-y-2">
+            <div class="flex justify-between">
+              <span>Exigences :</span>
+              <span class="font-medium">{{ requirementsArray.length }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Avantages :</span>
+              <span class="font-medium">{{ benefitsArray.length }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Caractères description :</span>
+              <span class="font-medium">{{ jobOfferForm.get('description')?.value?.length || 0 }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Statut :</span>
+              <span class="font-medium">{{ jobOfferForm.get('status')?.value === 'published' ? '🟢 Sera publiée' : '🟡 Brouillon' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
