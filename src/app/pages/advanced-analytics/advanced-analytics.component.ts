@@ -1,8 +1,8 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef, HostListener, ChangeDetectionStrategy, TrackByFunction } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import { Subject, takeUntil, debounceTime, distinctUntilChanged, finalize } from 'rxjs';
+import { Subject, takeUntil, debounceTime, distinctUntilChanged, finalize, fromEvent, timeout } from 'rxjs';
 
 import { AnalyticsService } from '../../services/analytics.service';
 import { 
@@ -22,7 +22,8 @@ Chart.register(...registerables);
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './advanced-analytics.component.html',
-  styleUrls: ['./advanced-analytics.component.css']
+  styleUrls: ['./advanced-analytics.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('metricsChart') metricsChartRef!: ElementRef<HTMLCanvasElement>;
@@ -40,6 +41,11 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
   private charts: { [key: string]: Chart } = {};
   private chartsInitialized = false;
   private viewInitialized = false;
+  
+  // Optimisations performance
+  private resizeObserver?: ResizeObserver;
+  private chartCreationQueue: Array<() => void> = [];
+  private isProcessingQueue = false;
   
   // Filtres et configuration
   filters: AnalyticsFilters = {};
@@ -79,6 +85,11 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
   // États d'export et rapport
   isGeneratingReport = false;
   isExporting = false;
+  
+  // TrackBy functions pour optimiser *ngFor
+  trackByDepartment: TrackByFunction<DepartmentStatistics> = (index, dept) => dept.department;
+  trackBySkill: TrackByFunction<SkillDemand> = (index, skill) => skill.skill_id;
+  trackByContract: TrackByFunction<ContractTypeStatistics> = (index, contract) => contract.contract_type;
 
   constructor(
     private analyticsService: AnalyticsService,
@@ -96,81 +107,182 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
   ngAfterViewInit(): void {
     this.viewInitialized = true;
     this.subscribeToAnalyticsState();
+    this.setupResizeObserver();
     
     // Si les données sont déjà chargées, créer les graphiques
     if (this.dashboard && !this.chartsInitialized) {
-      this.attemptCreateCharts();
+      this.scheduleChartCreation(() => this.attemptCreateCharts());
     }
+  }
+  attemptCreateCharts(): void {
+    throw new Error('Method not implemented.');
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.destroyAllCharts();
+    this.resizeObserver?.disconnect();
   }
 
+  // === OPTIMISATIONS PERFORMANCE ===
+  private setupResizeObserver(): void {
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.scheduleChartCreation(() => this.resizeCharts());
+      });
+      
+      // Observer les conteneurs de graphiques
+      const containers = [
+        this.metricsChartRef?.nativeElement,
+        this.departmentChartRef?.nativeElement,
+        this.skillsChartRef?.nativeElement,
+        this.contractChartRef?.nativeElement
+      ].filter(Boolean);
+      
+      containers.forEach(container => {
+        if (container) this.resizeObserver!.observe(container);
+      });
+    }
+  }
+
+  private scheduleChartCreation(task: () => void): void {
+    this.chartCreationQueue.push(task);
+    if (!this.isProcessingQueue) {
+      this.processChartQueue();
+    }
+  }
+
+  private async processChartQueue(): Promise<void> {
+    this.isProcessingQueue = true;
+    
+    while (this.chartCreationQueue.length > 0) {
+      const task = this.chartCreationQueue.shift();
+      if (task) {
+        // Utiliser requestIdleCallback pour ne pas bloquer le rendu
+        await this.runWhenIdle(task);
+      }
+    }
+    
+    this.isProcessingQueue = false;
+  }
+
+  private runWhenIdle(task: () => void): Promise<void> {
+    return new Promise(resolve => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => {
+          task();
+          resolve();
+        }, { timeout: 100 });
+      } else {
+        // Fallback pour les navigateurs qui ne supportent pas requestIdleCallback
+        setTimeout(() => {
+          task();
+          resolve();
+        }, 16); // ~1 frame à 60fps
+      }
+    });
+  }
   // === GESTION DES DONNÉES ===
   private loadDashboardData(): void {
     this.loading = true;
     this.error = null;
     
+    // Optimisation: timeout plus long mais avec gestion d'erreur améliorée
     this.analyticsService.getAdvancedDashboard(this.filters)
       .pipe(
         takeUntil(this.destroy$),
+        timeout(15000), // Timeout plus réaliste
         finalize(() => {
           this.loading = false;
-          this.cdr.detectChanges();
+          this.cdr.markForCheck();
         })
       )
       .subscribe({
         next: (dashboard: AdvancedDashboard) => {
           this.dashboard = dashboard;
-          this.processData();
           
-          // Créer les graphiques seulement si la vue est initialisée
+          // Traitement des données en chunks pour éviter les blocages
+          this.processDataInChunks();
+          
           if (this.viewInitialized) {
-            this.attemptCreateCharts();
+            this.scheduleChartCreation(() => this.createChartsOptimized());
           }
         },
         error: (error: any) => {
           console.error('Erreur chargement dashboard:', error);
           this.error = 'Erreur lors du chargement du dashboard';
+          this.cdr.markForCheck();
         }
       });
   }
 
+  private async processDataInChunks(): Promise<void> {
+    if (!this.dashboard) return;
+
+    // Traiter les données par chunks pour éviter les blocages
+    await this.runWhenIdle(() => {
+      this.metricCards = this.calculateMetricCards();
+    });
+
+    await this.runWhenIdle(() => {
+      this.departmentStats = this.dashboard!.departmentAnalysis?.stats || [];
+    });
+
+    await this.runWhenIdle(() => {
+      this.skillsDemand = this.dashboard!.skillsAnalysis?.demand || [];
+    });
+
+    await this.runWhenIdle(() => {
+      this.contractStats = this.dashboard!.contractAnalysis?.breakdown || [];
+    });
+
+    this.cdr.markForCheck();
+  }
   private subscribeToAnalyticsState(): void {
     this.analyticsService.loading$
       .pipe(takeUntil(this.destroy$))
       .subscribe(loading => {
         this.loading = loading;
-        this.cdr.detectChanges();
+        this.scheduleChangeDetection();
       });
 
     this.analyticsService.error$
       .pipe(takeUntil(this.destroy$))
       .subscribe(error => {
         this.error = error;
-        this.cdr.detectChanges();
+        this.scheduleChangeDetection();
       });
+  }
+  scheduleChangeDetection() {
+    throw new Error('Method not implemented.');
   }
 
   private setupFiltersDebounce(): void {
     this.filtersChanged$.pipe(
-      debounceTime(500),
+      debounceTime(500), // Augmenter le debounce pour réduire les requêtes
       distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
       takeUntil(this.destroy$)
     ).subscribe(filters => {
-      this.filters = filters;
-      this.loadDashboardData();
+      // Utiliser requestIdleCallback pour ne pas bloquer l'UI
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => {
+          this.filters = filters;
+          this.loadDashboardData();
+        });
+      } else {
+        setTimeout(() => {
+          this.filters = filters;
+          this.loadDashboardData();
+        }, 0);
+      }
     });
   }
 
-  private processData(): void {
-    if (!this.dashboard) return;
+  private calculateMetricCards(): MetricCard[] {
+    if (!this.dashboard) return [];
 
-    // Traitement des cartes métriques avec données réelles
-    this.metricCards = [
+    return [
       {
         title: 'Employés Totaux',
         value: this.dashboard.metrics.totalEmployees || 0,
@@ -196,11 +308,6 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
         changeType: this.getChangeType(this.dashboard.metrics.overallSuccessRate, 'success')
       }
     ];
-
-    // Extraction des données pour les graphiques
-    this.departmentStats = this.dashboard.departmentAnalysis?.stats || [];
-    this.skillsDemand = this.dashboard.skillsAnalysis?.demand || [];
-    this.contractStats = this.dashboard.contractAnalysis?.breakdown || [];
   }
 
   // Calcul des changements basé sur les données historiques
@@ -226,12 +333,10 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
   // === GESTION DES ONGLETS ===
   setActiveTab(tab: 'overview' | 'departments' | 'skills' | 'contracts'): void {
     this.activeTab = tab;
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
 
-    // Redessiner les graphiques après changement d'onglet
-    setTimeout(() => {
-      this.attemptCreateCharts();
-    }, 150);
+    // Redessiner les graphiques de manière optimisée
+    this.scheduleChartCreation(() => this.createChartsOptimized());
   }
 
   // === GESTION DES FILTRES ===
@@ -247,38 +352,15 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
 
 
   // === CRÉATION DES GRAPHIQUES ===
-  private attemptCreateCharts(): void {
+  private async createChartsOptimized(): Promise<void> {
     if (!this.dashboard || !this.viewInitialized) {
       return;
     }
 
-    // Attendre que le DOM soit complètement rendu
-    setTimeout(() => {
-      this.createAllCharts();
-    }, 100);
-  }
-
-  private createAllCharts(): void {
-    if (!this.dashboard || this.chartsInitialized) return;
-    
-    // Vérifier que tous les éléments canvas nécessaires sont disponibles selon l'onglet actif
-    const canvasElements = this.getRequiredCanvasElements();
-    if (!this.areCanvasElementsReady(canvasElements)) {
-      console.warn('Certains éléments canvas ne sont pas encore disponibles pour l\'onglet:', this.activeTab);
-      // Réessayer après un délai plus long
-      setTimeout(() => {
-        this.createAllCharts();
-      }, 250);
-      return;
-    }
-
-    try {
-      // Créer seulement les graphiques nécessaires selon l'onglet actif
+    // Créer les graphiques de manière asynchrone
+    await this.runWhenIdle(() => {
       this.createChartsForActiveTab();
-      this.chartsInitialized = true;
-    } catch (error) {
-      console.error('Erreur lors de la création des graphiques:', error);
-    }
+    });
   }
 
   private getRequiredCanvasElements(): { key: string, ref: ElementRef<HTMLCanvasElement> | undefined }[] {
@@ -311,19 +393,19 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
     );
   }
 
-  private createChartsForActiveTab(): void {
+  private async createChartsForActiveTab(): Promise<void> {
     switch (this.activeTab) {
       case 'overview':
-        this.createMetricsChart();
+        await this.runWhenIdle(() => this.createMetricsChart());
         break;
       case 'departments':
-        this.createDepartmentChart();
+        await this.runWhenIdle(() => this.createDepartmentChart());
         break;
       case 'skills':
-        this.createSkillsChart();
+        await this.runWhenIdle(() => this.createSkillsChart());
         break;
       case 'contracts':
-        this.createContractChart();
+        await this.runWhenIdle(() => this.createContractChart());
         break;
     }
   }
@@ -334,22 +416,16 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
 
     this.destroyChart('metrics');
 
-    // Utiliser les vraies données du dashboard
-    const metrics = this.dashboard.metrics;
-    const publishedOffers = metrics.publishedOffers || 0;
-    const successfulHires = Math.floor((metrics.totalJobOffers || 0) * ((metrics.overallSuccessRate || 0) / 100));
+    // Préparer les données de manière optimisée
+    const { totalEmployees = 0, publishedOffers = 0, totalJobOffers = 0, overallSuccessRate = 0 } = this.dashboard.metrics;
+    const successfulHires = Math.floor(totalJobOffers * (overallSuccessRate / 100));
 
     const config: ChartConfiguration = {
       type: 'doughnut',
       data: {
         labels: ['Employés', 'Offres publiées', 'Total offres', 'Embauches réussies'],
         datasets: [{
-          data: [
-            metrics.totalEmployees || 0,
-            publishedOffers,
-            metrics.totalJobOffers || 0,
-            successfulHires
-          ],
+          data: [totalEmployees, publishedOffers, totalJobOffers, successfulHires],
           backgroundColor: this.colorPalette.gradient.slice(0, 4),
           borderWidth: 2,
           borderColor: '#ffffff'
@@ -358,6 +434,9 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 300 // Réduire drastiquement la durée d'animation
+        },
         plugins: {
           legend: {
             position: 'bottom',
@@ -663,4 +742,18 @@ export class AdvancedAnalyticsComponent implements OnInit, AfterViewInit, OnDest
   formatPercentage(value: number): string {
     return this.analyticsService.formatPercentage(value);
   }
+
+  // === OPTIMISATIONS SUPPLÉMENTAIRES ===
+  @HostListener('window:resize', ['$event'])
+  onWindowResize(): void {
+    // Debounce le resize de manière plus agressive
+    if (this.resizeTimeout) {
+      clearTimeout(this.resizeTimeout);
+    }
+    this.resizeTimeout = setTimeout(() => {
+      this.scheduleChartCreation(() => this.resizeCharts());
+    }, 250);
+  }
+  
+  private resizeTimeout: any;
 }

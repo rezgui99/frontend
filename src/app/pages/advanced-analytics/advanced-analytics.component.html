@@ -209,7 +209,7 @@
         <div *ngIf="activeTab === 'overview'" class="space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Graphique métriques globales -->
-            <div class="bg-gray-50 rounded-lg p-4">
+            <div class="bg-gray-50 rounded-lg p-4" [style.will-change]="'contents'">
               <h3 class="text-lg font-semibold text-gray-900 mb-4">Répartition Globale</h3>
               <div class="relative h-80">
                 <div *ngIf="!dashboard?.metrics" class="flex items-center justify-center h-full text-gray-500">
@@ -220,7 +220,7 @@
                     <p>Aucune donnée disponible</p>
                   </div>
                 </div>
-                <canvas #metricsChart></canvas>
+                <canvas #metricsChart [style.will-change]="'contents'"></canvas>
               </div>
             </div>
 
@@ -285,7 +285,7 @@
                 <h4 class="font-semibold text-gray-900">Détails Départements</h4>
               </div>
               <div class="max-h-96 overflow-y-auto">
-                <div *ngFor="let dept of departmentStats" 
+                <div *ngFor="let dept of departmentStats; trackBy: trackByDepartment" 
                      class="p-4 border-b last:border-b-0 hover:bg-gray-50">
                   <div class="flex justify-between items-center mb-2">
                     <h5 class="font-medium text-gray-900">{{ dept.department }}</h5>
@@ -330,7 +330,7 @@
             <div class="space-y-3" *ngIf="skillsDemand && skillsDemand.length > 0">
               <h4 class="font-semibold text-gray-900">Analyse Détaillée</h4>
               <div class="space-y-3 max-h-96 overflow-y-auto">
-                <div *ngFor="let skill of skillsDemand.slice(0, 10)" 
+                <div *ngFor="let skill of skillsDemand.slice(0, 10); trackBy: trackBySkill" 
                      class="bg-white border rounded-lg p-3 hover:shadow-sm transition-shadow">
                   <div class="flex justify-between items-start mb-2">
                     <h5 class="font-medium text-gray-900 text-sm">{{ skill.skill_name }}</h5>
@@ -386,7 +386,7 @@
                 <h4 class="font-semibold text-gray-900">Statistiques Détaillées</h4>
               </div>
               <div class="p-4 space-y-4">
-                <div *ngFor="let contract of contractStats" 
+                <div *ngFor="let contract of contractStats; trackBy: trackByContract" 
                      class="border rounded-lg p-3 hover:bg-gray-50">
                   <div class="flex justify-between items-center mb-2">
                     <h5 class="font-medium text-gray-900">{{ contract.contract_type }}</h5>
