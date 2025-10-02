@@ -1,0 +1,229 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { CandidateService } from '../../../services/candidate.service';
+import { CandidateAuthService } from '../../../services/candidate-auth.service';
+import { 
+  JobOffer, 
+  CandidateCV, 
+  JobApplicationRequest,
+  Candidate 
+} from '../../../models/candidate.model';
+
+@Component({
+  selector: 'app-candidate-apply',
+  standalone: true,
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink],
+  templateUrl: './candidate-apply.component.html',
+  styleUrls: ['./candidate-apply.component.css']
+})
+export class CandidateApplyComponent implements OnInit {
+  jobOffer: JobOffer | null = null;
+  candidateCVs: CandidateCV[] = [];
+  currentCandidate: Candidate | null = null;
+  
+  applicationForm: FormGroup;
+  
+  loading = false;
+  submitting = false;
+  errorMessage: string | null = null;
+  successMessage: string | null = null;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private candidateService: CandidateService,
+    private candidateAuthService: CandidateAuthService,
+    private formBuilder: FormBuilder
+  ) {
+    this.applicationForm = this.formBuilder.group({
+      cv_id: [null, Validators.required],
+      cover_letter: ['', [Validators.required, Validators.minLength(50)]]
+    });
+  }
+
+  ngOnInit(): void {
+    // Récupérer l'ID de l'offre depuis l'URL
+    const jobOfferId = this.route.snapshot.paramMap.get('id');
+    if (jobOfferId) {
+      this.loadJobOffer(parseInt(jobOfferId));
+    }
+
+    // Récupérer le candidat actuel
+    this.candidateAuthService.currentCandidate$.subscribe(candidate => {
+      this.currentCandidate = candidate;
+    });
+
+    // Charger les CVs du candidat
+    this.loadCandidateCVs();
+  }
+
+  loadJobOffer(id: number): void {
+    this.loading = true;
+    this.errorMessage = null;
+
+    this.candidateService.getPublicJobOfferById(id).subscribe({
+      next: (jobOffer) => {
+        this.jobOffer = jobOffer;
+        this.loading = false;
+        
+        // Pré-remplir la lettre de motivation
+        this.prefillCoverLetter();
+      },
+      error: (error) => {
+        console.error('Error loading job offer:', error);
+        this.errorMessage = 'Offre d\'emploi non trouvée ou expirée';
+        this.loading = false;
+      }
+    });
+  }
+
+  loadCandidateCVs(): void {
+    this.candidateService.getCVs().subscribe({
+      next: (cvs) => {
+        this.candidateCVs = cvs;
+        
+        // Sélectionner automatiquement le CV principal
+        const primaryCV = cvs.find(cv => cv.is_primary);
+        if (primaryCV) {
+          this.applicationForm.patchValue({ cv_id: primaryCV.id });
+        }
+      },
+      error: (error) => {
+        console.error('Error loading CVs:', error);
+      }
+    });
+  }
+
+  prefillCoverLetter(): void {
+    if (!this.jobOffer || !this.currentCandidate) return;
+
+    const coverLetter = `Madame, Monsieur,
+
+Je me permets de vous adresser ma candidature pour le poste de ${this.jobOffer.title} au sein de ${this.jobOffer.company}.
+
+Votre offre a retenu toute mon attention car elle correspond parfaitement à mon profil et à mes aspirations professionnelles.
+
+${this.currentCandidate.bio ? `\n${this.currentCandidate.bio}\n` : ''}
+
+Je serais ravi(e) de pouvoir échanger avec vous sur cette opportunité et vous démontrer ma motivation lors d'un entretien.
+
+Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.
+
+${this.currentCandidate.firstName} ${this.currentCandidate.lastName}`;
+
+    this.applicationForm.patchValue({ cover_letter: coverLetter });
+  }
+
+
+  onSubmit(): void {
+    if (!this.applicationForm.valid || !this.jobOffer) {
+      this.markFormGroupTouched();
+      return;
+    }
+
+    this.submitting = true;
+    this.errorMessage = null;
+
+
+    const applicationData: JobApplicationRequest = {
+      job_offer_id: this.jobOffer.id!,
+      cv_id: this.applicationForm.value.cv_id ? parseInt(this.applicationForm.value.cv_id) : undefined,
+      cover_letter: this.applicationForm.value.cover_letter
+    };
+
+    console.log('📤 Sending application data:', applicationData);
+    console.log('📄 CV ID:', applicationData.cv_id);
+    console.log('✍️ Cover letter length:', applicationData.cover_letter?.length);
+    
+    // Validation finale côté client
+    if (!applicationData.cv_id) {
+      this.errorMessage = 'Veuillez sélectionner un CV';
+      this.submitting = false;
+      return;
+    }
+    
+    if (!applicationData.cover_letter || applicationData.cover_letter.trim().length < 50) {
+      this.errorMessage = 'La lettre de motivation doit contenir au moins 50 caractères';
+      this.submitting = false;
+      return;
+    }
+    
+    this.candidateService.applyToJobOffer(applicationData).subscribe({
+      next: (response) => {
+        console.log('✅ Application submitted successfully:', response);
+        this.successMessage = response.message;
+        
+        // Rediriger vers les candidatures après 3 secondes pour laisser le temps de lire le message
+        setTimeout(() => {
+          this.router.navigate(['/candidate/applications']);
+        }, 3000);
+      },
+      error: (error) => {
+        console.error('Error applying to job offer:', error);
+        this.errorMessage = error.message || 'Erreur lors de la candidature';
+        this.submitting = false;
+      }
+    });
+  }
+
+  private markFormGroupTouched(): void {
+    Object.keys(this.applicationForm.controls).forEach(key => {
+      const control = this.applicationForm.get(key);
+      control?.markAsTouched();
+    });
+  }
+
+  getFieldError(fieldName: string): string | null {
+    const field = this.applicationForm.get(fieldName);
+    
+    if (field?.errors && field.touched) {
+      if (field.errors['required']) {
+        if (fieldName === 'cv_id') {
+          return 'Veuillez sélectionner un CV';
+        }
+        if (fieldName === 'cover_letter') {
+          return 'La lettre de motivation est requise';
+        }
+        return 'Ce champ est requis';
+      }
+      if (field.errors['minlength']) {
+        if (fieldName === 'cover_letter') {
+          return `Lettre de motivation trop courte (minimum ${field.errors['minlength'].requiredLength} caractères)`;
+        }
+        return `Minimum ${field.errors['minlength'].requiredLength} caractères`;
+      }
+    }
+    
+    return null;
+  }
+
+  formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString('fr-FR');
+  }
+
+  getRequiredSkills(): any[] {
+    if (!this.jobOffer) return [];
+    
+    if (this.jobOffer.jobDescription?.requiredSkills) {
+      return this.jobOffer.jobDescription.requiredSkills;
+    }
+    if (this.jobOffer.required_skills) {
+      return this.jobOffer.required_skills;
+    }
+    return [];
+  }
+
+  getSkillName(skill: any): string {
+    return skill?.Skill?.name || skill?.name || 'Compétence non définie';
+  }
+
+  getSkillLevel(skill: any): string {
+    return skill?.SkillLevel?.level_name || skill?.level_name || 'Niveau non défini';
+  }
+
+  goBack(): void {
+    this.router.navigate(['/candidate/job-offers']);
+  }
+}

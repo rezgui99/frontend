@@ -1,0 +1,76 @@
+/* Job offer component styles */
+.prose {
+  max-width: none;
+}
+
+.prose h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.sticky {
+  position: sticky;
+}
+
+.top-6 {
+  top: 1.5rem;
+}
+
+/* Animation pour les suggestions */
+.suggestion-button {
+  transition: all 0.2s ease-in-out;
+}
+
+.suggestion-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles pour la prévisualisation */
+.preview-header {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.preview-stat {
+  transition: transform 0.2s ease-in-out;
+}
+
+.preview-stat:hover {
+  transform: scale(1.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .sticky {
+    position: static;
+  }
+}
+
+/* Form validation styles */
+.form-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Loading states */
+.saving-state {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Tooltip enhancements */
+[title] {
+  position: relative;
+  cursor: help;
+}
+
+/* Success animations */
+@keyframes success-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.success-animation {
+  animation: success-pulse 0.6s ease-in-out;
+}

@@ -1,0 +1,746 @@
+<div class="p-6">
+  <!-- Header avec statistiques -->
+  <div class="mb-8">
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h2 class="text-3xl font-bold text-primary">👥 Gestion Avancée des Utilisateurs</h2>
+        <p class="text-gray-600 mt-2">Administration complète des comptes et permissions</p>
+      </div>
+      <button (click)="showCreateUserForm()" 
+              class="btn btn-primary"
+              appTooltip="Créer un nouveau compte utilisateur avec rôles et permissions">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Créer un utilisateur
+      </button>
+    </div>
+
+    <!-- Statistiques rapides -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+      <div class="bg-blue-50 p-4 rounded-lg text-center">
+        <div class="text-2xl font-bold text-blue-600">{{ userStats.total }}</div>
+        <div class="text-sm text-gray-600">Total</div>
+      </div>
+      <div class="bg-green-50 p-4 rounded-lg text-center">
+        <div class="text-2xl font-bold text-green-600">{{ userStats.active }}</div>
+        <div class="text-sm text-gray-600">Actifs</div>
+      </div>
+      <div class="bg-red-50 p-4 rounded-lg text-center">
+        <div class="text-2xl font-bold text-red-600">{{ userStats.inactive }}</div>
+        <div class="text-sm text-gray-600">Inactifs</div>
+      </div>
+      <div class="bg-purple-50 p-4 rounded-lg text-center">
+        <div class="text-2xl font-bold text-purple-600">{{ userStats.admins }}</div>
+        <div class="text-sm text-gray-600">Admins</div>
+      </div>
+      <div class="bg-yellow-50 p-4 rounded-lg text-center">
+        <div class="text-2xl font-bold text-yellow-600">{{ userStats.hrs }}</div>
+        <div class="text-sm text-gray-600">RH</div>
+      </div>
+      <div class="bg-indigo-50 p-4 rounded-lg text-center">
+        <div class="text-2xl font-bold text-indigo-600">{{ userStats.recentLogins }}</div>
+        <div class="text-sm text-gray-600">Connexions 7j</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="fixed top-4 right-4 z-50 space-y-2">
+    <div *ngFor="let notification of notifications" 
+         [class]="'p-4 rounded-lg shadow-lg transition-all duration-300 ' + 
+                  (notification.type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
+                   notification.type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
+                   'bg-blue-100 border border-blue-400 text-blue-700')">
+      <div class="flex justify-between items-center">
+        <span class="text-sm">{{ notification.message }}</span>
+        <button (click)="removeNotification(notification.id)" class="ml-2 text-gray-500 hover:text-gray-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtres et recherche avancés -->
+  <div class="card mb-6">
+    <h3 class="text-lg font-semibold text-dark mb-4">🔍 Recherche et Filtres Avancés</h3>
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">Recherche globale</label>
+        <input type="text" [(ngModel)]="searchQuery" (input)="onSearch()" 
+               placeholder="Nom, email, username..." 
+               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+               appTooltip="Rechercher dans tous les champs utilisateur">
+      </div>
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">Filtrer par rôle</label>
+        <select [(ngModel)]="selectedRole" (change)="onFilterChange()" 
+                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                appTooltip="Afficher uniquement les utilisateurs avec ce rôle">
+          <option value="">Tous les rôles</option>
+          <option *ngFor="let role of roles" [value]="role.name">{{ role.name }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-gray-700 text-sm font-bold mb-2">Filtrer par statut</label>
+        <select [(ngModel)]="selectedStatus" (change)="onFilterChange()" 
+                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                appTooltip="Filtrer par statut d'activation du compte">
+          <option value="">Tous les statuts</option>
+          <option value="active">Actifs uniquement</option>
+          <option value="inactive">Inactifs uniquement</option>
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button (click)="clearFilters()" 
+                class="btn btn-secondary w-full"
+                appTooltip="Réinitialiser tous les filtres de recherche">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+          Effacer
+        </button>
+      </div>
+      <div class="flex items-end">
+        <button (click)="exportUsers()" 
+                class="btn btn-secondary w-full"
+                appTooltip="Télécharger la liste des utilisateurs en format CSV">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions en lot -->
+  <div *ngIf="selectedUsers.size > 0" class="card mb-6 bg-yellow-50 border-l-4 border-yellow-400">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-semibold text-dark">
+        ⚡ Actions en Lot ({{ selectedUsers.size }} sélectionné(s))
+      </h3>
+      <button (click)="selectedUsers.clear()" 
+              class="text-gray-500 hover:text-gray-700"
+              appTooltip="Désélectionner tous les utilisateurs">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <form [formGroup]="bulkActionForm" (ngSubmit)="performBulkAction()">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Action à effectuer</label>
+          <select formControlName="action" 
+                  class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  appTooltip="Choisir l'action à appliquer à tous les utilisateurs sélectionnés">
+            <option value="">-- Sélectionner une action --</option>
+            <option value="activate">Activer les comptes</option>
+            <option value="deactivate">Désactiver les comptes</option>
+            <option value="assign_role">Attribuer un rôle</option>
+            <option value="remove_role">Retirer un rôle</option>
+            <option value="delete">Supprimer définitivement</option>
+          </select>
+        </div>
+        
+        <div *ngIf="bulkActionForm.get('action')?.value === 'assign_role' || bulkActionForm.get('action')?.value === 'remove_role'">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Rôle concerné</label>
+          <select formControlName="roleId" 
+                  class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  appTooltip="Sélectionner le rôle à attribuer ou retirer">
+            <option value="">-- Sélectionner un rôle --</option>
+            <option *ngFor="let role of roles" [value]="role.id">{{ role.name }}</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">Raison (optionnel)</label>
+          <input type="text" formControlName="reason" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="Motif de l'action..."
+                 appTooltip="Justification de l'action pour l'historique d'audit">
+        </div>
+        
+        <div class="flex items-end">
+          <button type="submit" 
+                  [disabled]="!bulkActionForm.valid"
+                  class="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                  appTooltip="Exécuter l'action sélectionnée sur tous les utilisateurs choisis">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            Exécuter
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Formulaire de création/modification -->
+  <div *ngIf="showCreateForm" class="card mb-6">
+    <h3 class="text-xl font-semibold text-dark mb-4">
+      {{ editingUser ? '✏️ Modifier l\'utilisateur' : '➕ Créer un utilisateur' }}
+    </h3>
+    
+    <form [formGroup]="userForm" (ngSubmit)="onUserSubmit()">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Nom d'utilisateur *
+            <span class="text-xs text-gray-500 font-normal ml-2">(Identifiant unique de connexion)</span>
+          </label>
+          <input type="text" formControlName="username" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="username"
+                 appTooltip="Identifiant unique pour la connexion (3-50 caractères alphanumériques)">
+          <div *ngIf="userForm.get('username')?.invalid && userForm.get('username')?.touched" 
+               class="text-red-500 text-xs mt-1">
+            Nom d'utilisateur requis (3-50 caractères)
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Email *
+            <span class="text-xs text-gray-500 font-normal ml-2">(Adresse de contact principale)</span>
+          </label>
+          <input type="email" formControlName="email" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="user@example.com"
+                 appTooltip="Adresse email valide pour les notifications et la récupération de mot de passe">
+          <div *ngIf="userForm.get('email')?.invalid && userForm.get('email')?.touched" 
+               class="text-red-500 text-xs mt-1">
+            Email valide requis
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Prénom *
+            <span class="text-xs text-gray-500 font-normal ml-2">(Nom de famille)</span>
+          </label>
+          <input type="text" formControlName="firstName" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="Prénom"
+                 appTooltip="Prénom de l'utilisateur (2-50 caractères)">
+          <div *ngIf="userForm.get('firstName')?.invalid && userForm.get('firstName')?.touched" 
+               class="text-red-500 text-xs mt-1">
+            Prénom requis (2-50 caractères)
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Nom *
+            <span class="text-xs text-gray-500 font-normal ml-2">(Nom de famille)</span>
+          </label>
+          <input type="text" formControlName="lastName" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="Nom"
+                 appTooltip="Nom de famille de l'utilisateur (2-50 caractères)">
+          <div *ngIf="userForm.get('lastName')?.invalid && userForm.get('lastName')?.touched" 
+               class="text-red-500 text-xs mt-1">
+            Nom requis (2-50 caractères)
+          </div>
+        </div>
+        
+        <div class="md:col-span-2">
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Mot de passe {{ editingUser ? '(laisser vide pour ne pas changer)' : '*' }}
+            <span class="text-xs text-gray-500 font-normal ml-2">(Minimum 6 caractères sécurisés)</span>
+          </label>
+          <input type="password" formControlName="password" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="Minimum 6 caractères"
+                 appTooltip="Mot de passe sécurisé avec au moins 6 caractères">
+          <div *ngIf="userForm.get('password')?.invalid && userForm.get('password')?.touched" 
+               class="text-red-500 text-xs mt-1">
+            Mot de passe requis (minimum 6 caractères)
+          </div>
+        </div>
+        
+        <div class="md:col-span-2">
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Rôles et Permissions
+            <span class="text-xs text-gray-500 font-normal ml-2">(Définit les accès de l'utilisateur)</span>
+          </label>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 border rounded-md bg-gray-50">
+            <div *ngFor="let role of roles" class="flex items-center">
+              <input type="checkbox" [id]="'role-' + role.id" 
+                     [value]="role.id" 
+                     (change)="onRoleCheckboxChange($event, role.id)"
+                     class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+               <label [for]="'role-' + role.id" 
+                      [class]="'ml-2 block text-sm ' + (role.name === 'admin' ? 'text-red-800 font-bold' : 'text-blue-800')">
+                {{ role.name }}
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!editingUser" class="md:col-span-2">
+          <div class="flex items-center">
+            <input type="checkbox" formControlName="sendWelcomeEmail" 
+                   id="sendWelcomeEmail"
+                   class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+            <label for="sendWelcomeEmail" class="ml-2 block text-sm text-gray-900">
+              Envoyer un email de bienvenue
+              <span class="text-xs text-gray-500 block">(Notification automatique avec identifiants)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-6 flex gap-2">
+        <button type="submit" [disabled]="!userForm.valid" 
+                class="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                appTooltip="Sauvegarder les informations utilisateur">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          {{ editingUser ? 'Mettre à jour' : 'Créer' }}
+        </button>
+        <button type="button" (click)="cancelUserForm()" 
+                class="btn btn-secondary"
+                appTooltip="Annuler et fermer le formulaire">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+          Annuler
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Liste des utilisateurs avec sélection multiple -->
+  <div class="card">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-xl font-semibold text-dark">
+        📋 Liste des Utilisateurs ({{ totalUsers }})
+      </h3>
+      <div class="flex items-center space-x-4">
+        <label class="flex items-center text-sm text-gray-600">
+          <input type="checkbox" 
+                 [checked]="allUsersSelected"
+                 [indeterminate]="someUsersSelected"
+                 (change)="selectAllUsers()"
+                 class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
+                 appTooltip="Sélectionner/désélectionner tous les utilisateurs visibles">
+          Tout sélectionner
+        </label>
+        <div class="text-sm text-gray-600">
+          Page {{ currentPage }} sur {{ totalPages }}
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="loading" class="text-center text-primary py-8">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <p class="mt-2">Chargement des utilisateurs...</p>
+    </div>
+
+    <div *ngIf="!loading && users.length === 0" class="text-center text-gray-600 py-8">
+      <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a3 3 0 015.356-1.857M17 20v-2c0-.653-.146-1.28-.42-1.857M7 20v-2c0-.653.146-1.28.42-1.857M7 20h10m0 0a3 3 0 00-5.356-1.857M7 16.143A3 3 0 0112 13c1.482 0 2.86.51 3.944 1.386M12 14a3 3 0 100-6 3 3 0 000 6z"></path>
+      </svg>
+      <p>Aucun utilisateur trouvé.</p>
+      <p class="text-sm text-gray-500 mt-1">Modifiez vos critères de recherche ou créez un nouvel utilisateur.</p>
+    </div>
+
+    <div *ngIf="!loading && users.length > 0" class="overflow-x-auto">
+      <table class="min-w-full table-auto">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <input type="checkbox" 
+                     [checked]="allUsersSelected"
+                     [indeterminate]="someUsersSelected"
+                     (change)="selectAllUsers()"
+                     class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                     appTooltip="Sélectionner tous les utilisateurs de cette page">
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utilisateur</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôles</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activité</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngFor="let user of users" 
+              class="hover:bg-gray-50 transition-colors duration-150"
+              [class.bg-blue-50]="isUserSelected(user.id)">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <input type="checkbox" 
+                     [checked]="isUserSelected(user.id)"
+                     (change)="toggleUserSelection(user.id)"
+                     class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                     appTooltip="Sélectionner cet utilisateur pour les actions en lot">
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center">
+                <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-3">
+                  {{ user.firstName.charAt(0).toUpperCase() }}{{ user.lastName.charAt(0).toUpperCase() }}
+                </div>
+                <div>
+                  <div class="text-sm font-medium text-gray-900">{{ user.firstName }} {{ user.lastName }}</div>
+                  <div class="text-sm text-gray-500">{{ user.username }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm text-gray-900">{{ user.email }}</div>
+              <div class="flex items-center text-xs">
+                <span [class]="user.emailVerified ? 'text-green-600' : 'text-red-600'">
+                  {{ user.emailVerified ? '✓ Vérifié' : '✗ Non vérifié' }}
+                </span>
+                <span *ngIf="user.login_attempts > 0" class="ml-2 text-orange-600">
+                  ({{ user.login_attempts }} tentatives)
+                </span>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex flex-wrap gap-1">
+                <span *ngFor="let role of user.roles" 
+                      [class]="'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + getRoleBadgeClass(role.name)"
+                      [appTooltip]="role.description || 'Rôle ' + role.name">
+                  {{ role.name }}
+                </span>
+                <span *ngIf="user.roles.length === 0" 
+                      class="text-xs text-gray-400"
+                      appTooltip="Aucun rôle assigné - accès limité au système">
+                  Aucun rôle
+                </span>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span [class]="'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + getStatusBadgeClass(user.isActive)"
+                    [appTooltip]="user.isActive ? 'Compte actif - peut se connecter' : 'Compte désactivé - connexion bloquée'">
+                {{ user.isActive ? 'Actif' : 'Inactif' }}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <div>{{ formatLastLogin(user.lastLogin) }}</div>
+              <div *ngIf="user.last_login_ip" class="text-xs text-gray-400">
+                IP: {{ user.last_login_ip }}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <div class="flex flex-wrap gap-1">
+                <button (click)="editUser(user)" 
+                        class="text-blue-600 hover:text-blue-900 transition-colors duration-150 text-xs px-2 py-1 rounded"
+                        appTooltip="Modifier les informations de cet utilisateur">
+                  ✏️ Modifier
+                </button>
+                <button (click)="showRoleManagement(user)" 
+                        class="text-purple-600 hover:text-purple-900 transition-colors duration-150 text-xs px-2 py-1 rounded"
+                        appTooltip="Gérer les rôles et permissions de cet utilisateur">
+                  🎭 Rôles
+                </button>
+                <button (click)="showPasswordReset(user)" 
+                        class="text-yellow-600 hover:text-yellow-900 transition-colors duration-150 text-xs px-2 py-1 rounded"
+                        appTooltip="Réinitialiser le mot de passe de cet utilisateur">
+                  🔑 Reset MDP
+                </button>
+                <button (click)="toggleUserStatus(user)" 
+                        [class]="user.isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'"
+                        class="transition-colors duration-150 text-xs px-2 py-1 rounded"
+                        [appTooltip]="user.isActive ? 'Désactiver le compte utilisateur' : 'Réactiver le compte utilisateur'">
+                  {{ user.isActive ? '🔒 Désactiver' : '🔓 Activer' }}
+                </button>
+                <button (click)="deleteUser(user, true)" 
+                        class="text-red-600 hover:text-red-900 transition-colors duration-150 text-xs px-2 py-1 rounded"
+                        [disabled]="user.id === currentUserId"
+                        appTooltip="Supprimer définitivement cet utilisateur (irréversible)">
+                  🗑️ Supprimer
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination améliorée -->
+    <div *ngIf="totalPages > 1" class="flex items-center justify-between mt-6 p-4 bg-gray-50 rounded-lg">
+      <div class="text-sm text-gray-700">
+        Affichage de {{ ((currentPage - 1) * pageSize) + 1 }} à {{ getEndIndex() }} sur {{ totalUsers }} utilisateurs
+      </div>
+      <div class="flex items-center space-x-2">
+        <button (click)="goToPage(1)" 
+                [disabled]="currentPage === 1"
+                class="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                appTooltip="Aller à la première page">
+          ⏮️
+        </button>
+        <button (click)="goToPage(currentPage - 1)" 
+                [disabled]="currentPage === 1"
+                class="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                appTooltip="Page précédente">
+          ⬅️
+        </button>
+        
+        <div class="flex space-x-1">
+          <button *ngFor="let page of [].constructor(Math.min(5, totalPages)); let i = index" 
+                  (click)="goToPage(i + 1)"
+                  [class]="(i + 1) === currentPage ? 'btn btn-primary' : 'btn btn-secondary'"
+                  class="w-10 h-10"
+                  [appTooltip]="'Aller à la page ' + (i + 1)">
+            {{ i + 1 }}
+          </button>
+        </div>
+        
+        <button (click)="goToPage(currentPage + 1)" 
+                [disabled]="currentPage === totalPages"
+                class="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                appTooltip="Page suivante">
+          ➡️
+        </button>
+        <button (click)="goToPage(totalPages)" 
+                [disabled]="currentPage === totalPages"
+                class="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                appTooltip="Aller à la dernière page">
+          ⏭️
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de réinitialisation de mot de passe -->
+<div *ngIf="showPasswordResetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+    <div class="mt-3">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium text-gray-900">
+          🔑 Réinitialiser le mot de passe
+        </h3>
+        <button (click)="closePasswordResetModal()" 
+                class="text-gray-400 hover:text-gray-600"
+                appTooltip="Fermer cette fenêtre">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+        <div class="flex items-center">
+          <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-3">
+      {{ resettingPasswordUser?.firstName?.charAt(0)?.toUpperCase() }}
+{{ resettingPasswordUser?.lastName?.charAt(0)?.toUpperCase() }}
+
+          </div>
+          <div>
+            <p class="font-medium text-gray-900">{{ resettingPasswordUser?.firstName }} {{ resettingPasswordUser?.lastName }}</p>
+            <p class="text-sm text-gray-600">{{ resettingPasswordUser?.username }}</p>
+            <p class="text-sm text-gray-500">{{ resettingPasswordUser?.email }}</p>
+          </div>
+        </div>
+      </div>
+
+      <form [formGroup]="passwordResetForm" (ngSubmit)="onPasswordResetSubmit()">
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+            Nouveau mot de passe *
+            <span class="text-xs text-gray-500 font-normal ml-2">(Minimum 6 caractères)</span>
+          </label>
+          <input type="password" formControlName="newPassword" 
+                 class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                 placeholder="Nouveau mot de passe sécurisé"
+                 appTooltip="Mot de passe temporaire que l'utilisateur devra changer">
+          <div *ngIf="passwordResetForm.get('newPassword')?.invalid && passwordResetForm.get('newPassword')?.touched" 
+               class="text-red-500 text-xs mt-1">
+            Mot de passe requis (minimum 6 caractères)
+          </div>
+        </div>
+
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <div class="flex">
+            <svg class="h-5 w-5 text-yellow-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+            <div class="text-sm text-yellow-700">
+              <p class="font-medium">⚠️ Important :</p>
+              <p>L'utilisateur devra changer ce mot de passe lors de sa prochaine connexion.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-2">
+          <button type="button" (click)="closePasswordResetModal()" 
+                  class="btn btn-secondary"
+                  appTooltip="Annuler la réinitialisation">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            Annuler
+          </button>
+          <button type="submit" [disabled]="!passwordResetForm.valid" 
+                  class="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  appTooltip="Confirmer la réinitialisation du mot de passe">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+            </svg>
+            Réinitialiser
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de gestion des rôles -->
+<div *ngIf="showRoleManagementModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+    <div class="mt-3">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium text-gray-900">
+          🎭 Gestion des Rôles et Permissions
+        </h3>
+        <button (click)="closeRoleManagementModal()" 
+                class="text-gray-400 hover:text-gray-600"
+                appTooltip="Fermer cette fenêtre">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Informations utilisateur -->
+      <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-4">
+            {{ managingRolesUser?.firstName?.charAt(0)?.toUpperCase() }}{{ managingRolesUser?.lastName?.charAt(0)?.toUpperCase() }}
+          </div>
+          <div>
+            <p class="font-semibold text-gray-900 text-lg">{{ managingRolesUser?.firstName }} {{ managingRolesUser?.lastName }}</p>
+            <p class="text-sm text-gray-600">{{ managingRolesUser?.username }}</p>
+            <p class="text-sm text-gray-500">{{ managingRolesUser?.email }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Rôles actuels -->
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-3 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Rôles Actuels ({{ managingRolesUser?.roles?.length || 0 }})
+          </h4>
+
+          <div *ngIf="!managingRolesUser?.roles || managingRolesUser?.roles?.length === 0">
+               class="text-center text-gray-500 py-6 border-2 border-dashed border-gray-300 rounded-lg">
+            <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+            <p class="text-sm">Aucun rôle attribué</p>
+            <p class="text-xs text-gray-400">Cet utilisateur a un accès limité</p>
+          </div>
+
+          <div class="space-y-2">
+            <div *ngFor="let role of managingRolesUser?.roles || []" 
+                 class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div class="flex items-center">
+                <span [class]="'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-3 ' + getRoleBadgeClass(role.name)">
+                  {{ role.name }}
+                </span>
+                <div>
+                  <p class="text-sm font-medium text-gray-900">{{ role.name }}</p>
+                  <p class="text-xs text-gray-600">{{ role.description }}</p>
+                </div>
+              </div>
+              <button (click)="removeRole(role.id)" 
+                      class="text-red-600 hover:text-red-800 text-sm font-medium transition-colors duration-150"
+                      appTooltip="Retirer ce rôle de l'utilisateur">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rôles disponibles -->
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-3 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Rôles Disponibles
+          </h4>
+
+          <div *ngIf="managingRolesUser && getAvailableRoles(managingRolesUser).length === 0" 
+               class="text-center text-gray-500 py-6 border-2 border-dashed border-gray-300 rounded-lg">
+            <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm">Tous les rôles sont déjà attribués</p>
+            <p class="text-xs text-gray-400">Cet utilisateur a tous les rôles disponibles</p>
+          </div>
+
+          <div class="space-y-2">
+            <div *ngFor="let role of managingRolesUser ? getAvailableRoles(managingRolesUser) : []" 
+                 class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors duration-150">
+              <div class="flex items-center">
+                <span [class]="'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-3 ' + getRoleBadgeClass(role.name)">
+                  {{ role.name }}
+                </span>
+                <div>
+                  <p class="text-sm font-medium text-gray-900">{{ role.name }}</p>
+                  <p class="text-xs text-gray-600">{{ role.description }}</p>
+                  <div class="flex items-center text-xs text-gray-500 mt-1">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a3 3 0 015.356-1.857M17 20v-2c0-.653-.146-1.28-.42-1.857M7 20v-2c0-.653.146-1.28.42-1.857M7 20h10m0 0a3 3 0 00-5.356-1.857M7 16.143A3 3 0 0112 13c1.482 0 2.86.51 3.944 1.386M12 14a3 3 0 100-6 3 3 0 000 6z"></path>
+                    </svg>
+                    {{ role.userCount || 0 }} utilisateur(s)
+                  </div>
+                </div>
+              </div>
+              <button (click)="assignRole(role.id)" 
+                      class="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-150"
+                      appTooltip="Attribuer ce rôle à l'utilisateur">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Informations sur les permissions -->
+      <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+        <h5 class="font-medium text-gray-900 mb-2 flex items-center">
+          <svg class="w-4 h-4 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Guide des Rôles
+        </h5>
+        <div class="text-xs text-gray-600 space-y-1">
+          <p><strong>Admin :</strong> Accès complet au système, gestion des utilisateurs et rôles</p>
+          <p><strong>HR :</strong> Gestion des employés, fiches de poste, matching et analytics</p>
+          <p><strong>User :</strong> Accès en lecture seule aux données de base</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button (click)="closeRoleManagementModal()" 
+                class="btn btn-secondary"
+                appTooltip="Fermer la gestion des rôles">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
