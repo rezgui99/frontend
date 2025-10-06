@@ -11,7 +11,7 @@ services:
     depends_on:
       - db
       - fastapi
-      - recommendation-api   
+      - recommendation-api
     command: nodemon
     env_file:
       - .env
@@ -22,14 +22,15 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     ports:
-      - "${FAST_API_PORT}:8000"     
-      - ./fast_api:/app
+      - "8000:8000"
+    volumes:
+      - ./fast_api:/app    # ✅ bien dans un array YAML
     environment:
       - PYTHONUNBUFFERED=1
 
-  recommendation-api:            
+  recommendation-api:
     build:
-      context: ./recommendation_api  
+      context: ./recommendation_api
       dockerfile: Dockerfile
     container_name: recommendation_api
     ports:

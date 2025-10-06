@@ -145,11 +145,11 @@ async def get_training_recommendations(request: TrainingRecommendationRequest):
     aux exigences d'un poste cible et recommande des formations pour combler les écarts.
     """
     try:
-        logger.info(f"🎯 Processing training recommendations request")
-        logger.info(f"📋 Employee ID: {request.employee.id}")
-        logger.info(f"🎯 Target job ID: {request.target_job.id}")
-        logger.info(f"⚙️ Max recommendations: {request.max_recommendations}")
-        logger.info(f"🎯 Priority threshold: {request.priority_threshold}")
+        logger.info(f" Processing training recommendations request")
+        logger.info(f" Employee ID: {request.employee.id}")
+        logger.info(f" Target job ID: {request.target_job.id}")
+        logger.info(f" Max recommendations: {request.max_recommendations}")
+        logger.info(f" Priority threshold: {request.priority_threshold}")
         
         # Traitement des données
         processed_employee = data_processor.process_employee_data(request.employee)
